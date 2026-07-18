@@ -7,40 +7,43 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from services.gemini_service import analyze_transactions
+from services.gemini_service import (
+    analyze_transactions,
+    ask_financial_assistant,
+)
 
 
 # ── Konfigurasi & Konstanta Keamanan ────────────────────────────────
 MAX_INPUT_LENGTH = 1000
+MAX_CHAT_LENGTH = 500
 MAX_AMOUNT = 10_000_000_000
-MAX_TRANSACTIONS_PER_REQUEST = 50  # batasi jumlah transaksi per satu kali analisis
-MAX_TOTAL_TRANSACTIONS = 5000  # batasi total riwayat per sesi (anti memory-bloat)
-RATE_LIMIT_SECONDS = 3  # jeda minimum antar permintaan analisis
+MAX_TRANSACTIONS_PER_REQUEST = 50
+MAX_TOTAL_TRANSACTIONS = 5000
+RATE_LIMIT_SECONDS = 3
 
 ISO_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 FORMULA_TRIGGER_CHARS = ("=", "+", "-", "@", "\t", "\r")
-SECRET_LIKE_PATTERN = re.compile(r"(sk-[A-Za-z0-9\-_]{10,}|AIza[A-Za-z0-9\-_]{20,})")
+SECRET_LIKE_PATTERN = re.compile(
+    r"(sk-[A-Za-z0-9\-_]{10,}|AIza[A-Za-z0-9\-_]{20,})"
+)
 
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 LOGO_PATH = ASSETS_DIR / "logo.png"
 FAVICON_PATH = ASSETS_DIR / "favicon.png"
 
-# Mode debug HANYA aktif jika diset eksplisit di Streamlit Secrets.
-# Jangan pernah menampilkan detail error mentah ke user di production,
-# karena bisa membocorkan informasi internal (stack trace, endpoint, dsb).
+
+# Mode debug hanya aktif jika diset melalui Streamlit Secrets.
 try:
-    DEBUG_MODE = bool(st.secrets.get("DEBUG_MODE", False))
+    DEBUG_MODE = bool(
+        st.secrets.get("DEBUG_MODE", False)
+    )
 except (FileNotFoundError, KeyError):
     DEBUG_MODE = False
 
 
 def resolve_date(value: str) -> str:
-    """Mengubah tanggal relatif dari AI menjadi tanggal aktual.
+    """Mengubah tanggal relatif dari AI menjadi tanggal aktual."""
 
-    Setiap nilai yang tidak dikenali atau tidak valid akan fallback
-    dengan aman ke hari ini, alih-alih diloloskan mentah-mentah ke
-    dalam data (mencegah nilai sampah/format asing masuk ke laporan).
-    """
     today = date.today()
     normalized_value = str(value).strip().upper()
 
@@ -48,10 +51,14 @@ def resolve_date(value: str) -> str:
         return today.isoformat()
 
     if normalized_value == "YESTERDAY":
-        return (today - timedelta(days=1)).isoformat()
+        return (
+            today - timedelta(days=1)
+        ).isoformat()
 
     if normalized_value == "TOMORROW":
-        return (today + timedelta(days=1)).isoformat()
+        return (
+            today + timedelta(days=1)
+        ).isoformat()
 
     candidate = str(value).strip()
 
@@ -67,21 +74,13 @@ def resolve_date(value: str) -> str:
 
 def format_rupiah(value: int | float) -> str:
     """Mengubah angka menjadi format Rupiah."""
+
     return f"Rp{value:,.0f}".replace(",", ".")
 
 
 def coerce_amount(raw_amount) -> int | None:
-    """Konversi nilai amount ke int secara aman.
+    """Mengonversi nominal menjadi integer secara aman."""
 
-    - Menolak bool secara eksplisit (bool adalah subclass int di Python,
-      sehingga tanpa pengecekan ini True/False bisa lolos jadi 1/0).
-    - Menerima int langsung.
-    - Menerima float HANYA jika nilainya bulat (mis. 300000.0),
-      supaya tidak ada pembulatan diam-diam yang mengubah nominal.
-    - Menerima string angka (mis. "300000" atau "300.000") sebagai
-      jaring pengaman jika API mengembalikan angka sebagai teks.
-    - Selain itu, dianggap tidak valid.
-    """
     if isinstance(raw_amount, bool):
         return None
 
@@ -91,72 +90,121 @@ def coerce_amount(raw_amount) -> int | None:
     if isinstance(raw_amount, float):
         if raw_amount.is_integer():
             return int(raw_amount)
+
         return None
 
     if isinstance(raw_amount, str):
-        cleaned = raw_amount.strip().replace(".", "").replace(",", "")
+        cleaned = (
+            raw_amount
+            .strip()
+            .replace(".", "")
+            .replace(",", "")
+        )
+
         if cleaned.isdigit():
             return int(cleaned)
 
     return None
 
 
-def sanitize_text_field(value, max_length: int) -> str:
-    """Bersihkan teks bebas dari karakter kontrol dan batasi panjangnya."""
+def sanitize_text_field(
+    value,
+    max_length: int,
+) -> str:
+    """Membersihkan teks bebas dan membatasi panjang."""
+
     text = str(value).strip()
-    text = "".join(ch for ch in text if ch.isprintable() or ch == "\n")
+
+    text = "".join(
+        character
+        for character in text
+        if character.isprintable()
+        or character == "\n"
+    )
+
     return text[:max_length]
 
 
 def sanitize_excel_cell(text: str) -> str:
-    """Cegah Formula Injection saat file dibuka di Excel/Google Sheets.
+    """Mencegah formula injection pada file Excel."""
 
-    Jika teks (yang berasal dari input pengguna via AI) diawali karakter
-    pemicu formula seperti '=', '+', '-', '@', akan diberi prefix kutip
-    satu agar Excel memperlakukannya sebagai teks biasa, bukan formula.
-    """
     text = str(text)
-    if text.startswith(FORMULA_TRIGGER_CHARS):
+
+    if text.startswith(
+        FORMULA_TRIGGER_CHARS
+    ):
         text = "'" + text
+
     return text
 
 
-def validate_transactions(raw_transactions: list) -> list:
-    """Memeriksa hasil AI sebelum dimasukkan ke riwayat."""
+def validate_transactions(
+    raw_transactions: list,
+) -> list:
+    """Memeriksa hasil AI sebelum masuk riwayat."""
+
     validated_transactions = []
 
-    if not isinstance(raw_transactions, list):
+    if not isinstance(
+        raw_transactions,
+        list,
+    ):
         return validated_transactions
 
-    for item in raw_transactions[:MAX_TRANSACTIONS_PER_REQUEST]:
+    for item in raw_transactions[
+        :MAX_TRANSACTIONS_PER_REQUEST
+    ]:
         if not isinstance(item, dict):
             continue
 
         transaction_type = item.get("type")
 
-        if transaction_type not in {"income", "expense"}:
+        if transaction_type not in {
+            "income",
+            "expense",
+        }:
             continue
 
-        amount = coerce_amount(item.get("amount"))
+        amount = coerce_amount(
+            item.get("amount")
+        )
 
-        if amount is None or amount <= 0 or amount > MAX_AMOUNT:
+        if (
+            amount is None
+            or amount <= 0
+            or amount > MAX_AMOUNT
+        ):
             continue
 
-        category = sanitize_text_field(item.get("category", ""), 60)
-        description = sanitize_text_field(item.get("description", ""), 120)
+        category = sanitize_text_field(
+            item.get("category", ""),
+            60,
+        )
+
+        description = sanitize_text_field(
+            item.get("description", ""),
+            120,
+        )
 
         validated_transactions.append(
             {
                 "Tanggal": resolve_date(
-                    item.get("date", "TODAY")
+                    item.get(
+                        "date",
+                        "TODAY",
+                    )
                 ),
                 "Jenis": (
                     "Pemasukan"
                     if transaction_type == "income"
                     else "Pengeluaran"
                 ),
-                "Kategori": sanitize_excel_cell(category),
-                "Keterangan": sanitize_excel_cell(description),
+                "Kategori": sanitize_excel_cell(
+                    category
+                ),
+                "Keterangan": sanitize_excel_cell(
+                    description
+                ),
                 "Nominal": amount,
                 "Perlu Konfirmasi": (
                     "Ya"
@@ -172,11 +220,22 @@ def validate_transactions(raw_transactions: list) -> list:
     return validated_transactions
 
 
-def redact_secret_like_strings(text: str, api_key: str | None = None) -> str:
-    """Sensor string yang mirip API key sebelum ditampilkan ke user."""
+def redact_secret_like_strings(
+    text: str,
+    api_key: str | None = None,
+) -> str:
+    """Menyensor string yang menyerupai API key."""
+
     if api_key:
-        text = text.replace(api_key, "[REDACTED]")
-    return SECRET_LIKE_PATTERN.sub("[REDACTED]", text)
+        text = text.replace(
+            api_key,
+            "[REDACTED]",
+        )
+
+    return SECRET_LIKE_PATTERN.sub(
+        "[REDACTED]",
+        text,
+    )
 
 
 def create_excel_report(
@@ -186,7 +245,8 @@ def create_excel_report(
     net_result: int,
     expense_ratio: float,
 ) -> BytesIO:
-    """Membuat laporan Excel transaksi dan ringkasan keuangan."""
+    """Membuat laporan Excel transaksi dan ringkasan."""
+
     excel_buffer = BytesIO()
 
     financial_status = (
@@ -238,8 +298,13 @@ def create_excel_report(
 
         workbook = writer.book
 
-        transaction_sheet = workbook["Transaksi"]
-        summary_sheet = workbook["Ringkasan Keuangan"]
+        transaction_sheet = workbook[
+            "Transaksi"
+        ]
+
+        summary_sheet = workbook[
+            "Ringkasan Keuangan"
+        ]
 
         transaction_widths = {
             "A": 15,
@@ -250,42 +315,73 @@ def create_excel_report(
             "F": 20,
         }
 
-        for column, width in transaction_widths.items():
-            transaction_sheet.column_dimensions[column].width = width
+        for (
+            column,
+            width,
+        ) in transaction_widths.items():
+            transaction_sheet.column_dimensions[
+                column
+            ].width = width
 
-        summary_sheet.column_dimensions["A"].width = 25
-        summary_sheet.column_dimensions["B"].width = 25
+        summary_sheet.column_dimensions[
+            "A"
+        ].width = 25
+
+        summary_sheet.column_dimensions[
+            "B"
+        ].width = 25
 
         for cell in transaction_sheet[1]:
-            cell.font = cell.font.copy(bold=True)
-
-        for cell in summary_sheet[1]:
-            cell.font = cell.font.copy(bold=True)
-
-        for row in range(2, transaction_sheet.max_row + 1):
-            transaction_sheet[f"E{row}"].number_format = (
-                '"Rp"#,##0'
+            cell.font = cell.font.copy(
+                bold=True
             )
 
-        summary_sheet["B2"].number_format = '"Rp"#,##0'
-        summary_sheet["B3"].number_format = '"Rp"#,##0'
-        summary_sheet["B4"].number_format = '"Rp"#,##0'
+        for cell in summary_sheet[1]:
+            cell.font = cell.font.copy(
+                bold=True
+            )
+
+        for row in range(
+            2,
+            transaction_sheet.max_row + 1,
+        ):
+            transaction_sheet[
+                f"E{row}"
+            ].number_format = '"Rp"#,##0'
+
+        summary_sheet[
+            "B2"
+        ].number_format = '"Rp"#,##0'
+
+        summary_sheet[
+            "B3"
+        ].number_format = '"Rp"#,##0'
+
+        summary_sheet[
+            "B4"
+        ].number_format = '"Rp"#,##0'
 
         transaction_sheet.freeze_panes = "A2"
         summary_sheet.freeze_panes = "A2"
 
     excel_buffer.seek(0)
+
     return excel_buffer
 
 
-# ── Konfigurasi Halaman (dengan fallback aman untuk aset) ──────────
+# ── Konfigurasi Halaman ──────────────────────────────────────────────
 st.set_page_config(
     page_title="CatatCuan AI",
-    page_icon=str(FAVICON_PATH) if FAVICON_PATH.exists() else "💰",
+    page_icon=(
+        str(FAVICON_PATH)
+        if FAVICON_PATH.exists()
+        else "💰"
+    ),
     layout="wide",
 )
 
 
+# ── CSS Tampilan ─────────────────────────────────────────────────────
 st.markdown(
     """
     <style>
@@ -328,6 +424,20 @@ st.markdown(
     }
 
     .stTextArea textarea:focus {
+        border-color: #1F8A5B;
+        box-shadow:
+            0 0 0 2px
+            rgba(31, 138, 91, 0.15);
+    }
+
+    .stTextInput input {
+        border-radius: 12px;
+        min-height: 48px;
+        border: 1px solid #CBDDD2;
+        background-color: #FFFFFF;
+    }
+
+    .stTextInput input:focus {
         border-color: #1F8A5B;
         box-shadow:
             0 0 0 2px
@@ -406,6 +516,25 @@ st.markdown(
         color: #FFFFFF;
     }
 
+    .chat-answer {
+        background: #FFFFFF;
+        border: 1px solid #DCE9E1;
+        border-radius: 16px;
+        padding: 20px 22px;
+        box-shadow:
+            0 6px 20px
+            rgba(30, 70, 50, 0.06);
+        margin-top: 12px;
+        margin-bottom: 20px;
+    }
+
+    .chat-answer-title {
+        color: #176B46;
+        font-size: 16px;
+        font-weight: 800;
+        margin-bottom: 8px;
+    }
+
     #MainMenu {
         visibility: hidden;
     }
@@ -423,17 +552,29 @@ st.markdown(
 )
 
 
+# ── Session State ────────────────────────────────────────────────────
 if "transactions" not in st.session_state:
     st.session_state.transactions = []
 
 if "last_request_time" not in st.session_state:
     st.session_state.last_request_time = 0.0
 
+if "last_chat_request_time" not in st.session_state:
+    st.session_state.last_chat_request_time = 0.0
 
-# Logo dengan fallback jika file aset tidak ditemukan, supaya app
-# tidak crash total hanya karena satu file gambar hilang/salah path.
+if "chat_question" not in st.session_state:
+    st.session_state.chat_question = ""
+
+if "chat_answer" not in st.session_state:
+    st.session_state.chat_answer = ""
+
+
+# ── Header ───────────────────────────────────────────────────────────
 if LOGO_PATH.exists():
-    st.image(str(LOGO_PATH), width=380)
+    st.image(
+        str(LOGO_PATH),
+        width=380,
+    )
 else:
     st.title("CatatCuan AI")
 
@@ -448,6 +589,7 @@ st.info(
 )
 
 
+# ── Input Transaksi ──────────────────────────────────────────────────
 user_input = st.text_area(
     "Ceritakan transaksi usaha kamu",
     placeholder=(
@@ -479,14 +621,24 @@ with button_column_2:
 
 if clear_button:
     st.session_state.transactions = []
+    st.session_state.chat_question = ""
+    st.session_state.chat_answer = ""
     st.rerun()
 
 
+# ── Proses Analisis Transaksi ────────────────────────────────────────
 if analyze_button:
     now = time.time()
-    seconds_since_last_request = now - st.session_state.last_request_time
 
-    if seconds_since_last_request < RATE_LIMIT_SECONDS:
+    seconds_since_last_request = (
+        now
+        - st.session_state.last_request_time
+    )
+
+    if (
+        seconds_since_last_request
+        < RATE_LIMIT_SECONDS
+    ):
         st.warning(
             "Mohon tunggu beberapa detik sebelum "
             "mengirim permintaan berikutnya."
@@ -499,35 +651,52 @@ if analyze_button:
 
     else:
         try:
-            api_key = st.secrets["GEMINI_API_KEY"]
+            api_key = st.secrets[
+                "GEMINI_API_KEY"
+            ]
 
-        except (FileNotFoundError, KeyError):
+        except (
+            FileNotFoundError,
+            KeyError,
+        ):
             st.error(
                 "GEMINI_API_KEY belum dipasang "
                 "di Streamlit Secrets."
             )
 
         else:
-            # Batasi panjang input sekali lagi di sisi server
-            # (jangan hanya mengandalkan max_chars di sisi klien,
-            # karena itu bisa dilewati lewat request langsung).
-            safe_user_input = user_input.strip()[:MAX_INPUT_LENGTH]
+            safe_user_input = (
+                user_input
+                .strip()
+                [:MAX_INPUT_LENGTH]
+            )
 
             try:
-                st.session_state.last_request_time = now
+                st.session_state.last_request_time = (
+                    now
+                )
 
                 with st.spinner(
-                    "CatatCuan AI sedang membaca transaksi..."
+                    "CatatCuan AI sedang "
+                    "membaca transaksi..."
                 ):
                     result = analyze_transactions(
                         api_key=api_key,
                         user_input=safe_user_input,
                     )
 
-                new_transactions = validate_transactions(
-                    result.get("transactions", [])
-                    if isinstance(result, dict)
-                    else []
+                new_transactions = (
+                    validate_transactions(
+                        result.get(
+                            "transactions",
+                            [],
+                        )
+                        if isinstance(
+                            result,
+                            dict,
+                        )
+                        else []
+                    )
                 )
 
                 if not new_transactions:
@@ -539,34 +708,50 @@ if analyze_button:
                 else:
                     remaining_capacity = (
                         MAX_TOTAL_TRANSACTIONS
-                        - len(st.session_state.transactions)
+                        - len(
+                            st.session_state
+                            .transactions
+                        )
                     )
 
                     if remaining_capacity <= 0:
                         st.warning(
-                            "Riwayat transaksi sudah mencapai "
-                            f"batas maksimum ({MAX_TOTAL_TRANSACTIONS}). "
-                            "Silakan unduh laporan lalu hapus riwayat."
+                            "Riwayat transaksi sudah "
+                            "mencapai batas maksimum "
+                            f"({MAX_TOTAL_TRANSACTIONS}). "
+                            "Silakan unduh laporan lalu "
+                            "hapus riwayat."
                         )
 
                     else:
-                        if len(new_transactions) > remaining_capacity:
-                            new_transactions = new_transactions[
-                                :remaining_capacity
-                            ]
+                        if (
+                            len(new_transactions)
+                            > remaining_capacity
+                        ):
+                            new_transactions = (
+                                new_transactions[
+                                    :remaining_capacity
+                                ]
+                            )
+
                             st.warning(
-                                "Sebagian transaksi tidak ditambahkan "
-                                "karena riwayat sudah mendekati batas "
-                                f"maksimum ({MAX_TOTAL_TRANSACTIONS})."
+                                "Sebagian transaksi tidak "
+                                "ditambahkan karena riwayat "
+                                "sudah mendekati batas "
+                                f"maksimum "
+                                f"({MAX_TOTAL_TRANSACTIONS})."
                             )
 
                         st.session_state.transactions.extend(
                             new_transactions
                         )
 
+                        st.session_state.chat_answer = ""
+
                         st.success(
-                            f"{len(new_transactions)} transaksi "
-                            "berhasil ditambahkan."
+                            f"{len(new_transactions)} "
+                            "transaksi berhasil "
+                            "ditambahkan."
                         )
 
             except Exception as error:
@@ -575,20 +760,19 @@ if analyze_button:
                     "Silakan coba kembali."
                 )
 
-                # Detail error HANYA ditampilkan jika DEBUG_MODE aktif,
-                # dan tetap disensor untuk jaga-jaga andai ada string
-                # mirip API key yang ikut terbawa di pesan error.
                 if DEBUG_MODE:
                     with st.expander(
                         "Lihat detail error"
                     ):
                         st.code(
                             redact_secret_like_strings(
-                                str(error), api_key
+                                str(error),
+                                api_key,
                             )
                         )
 
 
+# ── Dashboard & Laporan ──────────────────────────────────────────────
 if st.session_state.transactions:
     dataframe = pd.DataFrame(
         st.session_state.transactions
@@ -596,23 +780,29 @@ if st.session_state.transactions:
 
     total_income = int(
         dataframe.loc[
-            dataframe["Jenis"] == "Pemasukan",
+            dataframe["Jenis"]
+            == "Pemasukan",
             "Nominal",
         ].sum()
     )
 
     total_expense = int(
         dataframe.loc[
-            dataframe["Jenis"] == "Pengeluaran",
+            dataframe["Jenis"]
+            == "Pengeluaran",
             "Nominal",
         ].sum()
     )
 
-    net_result = total_income - total_expense
+    net_result = (
+        total_income
+        - total_expense
+    )
 
     if total_income > 0:
         expense_ratio = (
-            total_expense / total_income
+            total_expense
+            / total_income
         ) * 100
     else:
         expense_ratio = 0
@@ -620,32 +810,44 @@ if st.session_state.transactions:
 
     st.divider()
 
-    st.subheader("📊 Ringkasan Keuangan")
-
-    metric_column_1, metric_column_2, metric_column_3 = (
-        st.columns(3)
+    st.subheader(
+        "📊 Ringkasan Keuangan"
     )
+
+    (
+        metric_column_1,
+        metric_column_2,
+        metric_column_3,
+    ) = st.columns(3)
 
     metric_column_1.metric(
         "Total Pemasukan",
-        format_rupiah(total_income),
+        format_rupiah(
+            total_income
+        ),
     )
 
     metric_column_2.metric(
         "Total Pengeluaran",
-        format_rupiah(total_expense),
+        format_rupiah(
+            total_expense
+        ),
     )
 
     if net_result > 0:
         metric_column_3.metric(
             "Laba Bersih",
-            format_rupiah(net_result),
+            format_rupiah(
+                net_result
+            ),
         )
 
     elif net_result < 0:
         metric_column_3.metric(
             "Kerugian",
-            format_rupiah(abs(net_result)),
+            format_rupiah(
+                abs(net_result)
+            ),
         )
 
     else:
@@ -655,49 +857,62 @@ if st.session_state.transactions:
         )
 
 
-    st.subheader("💡 Insight Keuangan")
+    st.subheader(
+        "💡 Insight Keuangan"
+    )
 
     if net_result > 0:
         st.success(
-            f"Usaha mencatat laba bersih sebesar "
+            "Usaha mencatat laba bersih "
+            f"sebesar "
             f"{format_rupiah(net_result)}."
         )
 
     elif net_result < 0:
         st.warning(
-            f"Usaha mencatat kerugian sebesar "
+            "Usaha mencatat kerugian "
+            f"sebesar "
             f"{format_rupiah(abs(net_result))}."
         )
 
     else:
         st.info(
-            "Total pemasukan dan pengeluaran sama. "
-            "Kondisi keuangan sedang impas."
+            "Total pemasukan dan pengeluaran "
+            "sama. Kondisi keuangan sedang "
+            "impas."
         )
 
     if total_income > 0:
         st.write(
-            f"Pengeluaran menggunakan "
-            f"{expense_ratio:.1f}% dari total pemasukan."
+            "Pengeluaran menggunakan "
+            f"{expense_ratio:.1f}% dari "
+            "total pemasukan."
         )
 
     elif total_expense > 0:
         st.write(
-            "Belum ada pemasukan yang tercatat, "
-            "tetapi sudah terdapat pengeluaran."
+            "Belum ada pemasukan yang "
+            "tercatat, tetapi sudah terdapat "
+            "pengeluaran."
         )
 
 
-    st.subheader("🧾 Riwayat Transaksi")
+    st.subheader(
+        "🧾 Riwayat Transaksi"
+    )
 
-    display_dataframe = dataframe.copy()
+    display_dataframe = (
+        dataframe.copy()
+    )
 
     display_dataframe.index = (
         display_dataframe.index + 1
     )
 
     display_dataframe["Nominal"] = (
-        display_dataframe["Nominal"].apply(
+        display_dataframe[
+            "Nominal"
+        ].apply(
             format_rupiah
         )
     )
@@ -711,14 +926,17 @@ if st.session_state.transactions:
 
     confirmation_count = int(
         (
-            dataframe["Perlu Konfirmasi"] == "Ya"
+            dataframe[
+                "Perlu Konfirmasi"
+            ]
+            == "Ya"
         ).sum()
     )
 
     if confirmation_count > 0:
         st.warning(
-            f"{confirmation_count} transaksi perlu "
-            "diperiksa kembali."
+            f"{confirmation_count} transaksi "
+            "perlu diperiksa kembali."
         )
 
     else:
@@ -728,6 +946,7 @@ if st.session_state.transactions:
         )
 
 
+    # ── Download Excel ───────────────────────────────────────────────
     excel_buffer = create_excel_report(
         dataframe=dataframe,
         total_income=total_income,
@@ -737,31 +956,230 @@ if st.session_state.transactions:
     )
 
     st.download_button(
-        label="📥 Download Laporan Keuangan Excel",
+        label=(
+            "📥 Download Laporan "
+            "Keuangan Excel"
+        ),
         data=excel_buffer,
         file_name=(
             f"CatatCuanAI_Laporan_"
-            f"{date.today().isoformat()}.xlsx"
+            f"{date.today().isoformat()}"
+            f".xlsx"
         ),
         mime=(
-            "application/vnd.openxmlformats-"
-            "officedocument.spreadsheetml.sheet"
+            "application/vnd."
+            "openxmlformats-officedocument."
+            "spreadsheetml.sheet"
         ),
         use_container_width=True,
     )
+
+
+    # ── AI Finance Chat ──────────────────────────────────────────────
+    st.divider()
+
+    st.subheader(
+        "💬 Tanya CatatCuan AI"
+    )
+
+    st.caption(
+        "Tanyakan apa saja berdasarkan "
+        "transaksi yang sudah kamu catat."
+    )
+
+    (
+        suggestion_column_1,
+        suggestion_column_2,
+        suggestion_column_3,
+    ) = st.columns(3)
+
+    with suggestion_column_1:
+        suggestion_1 = st.button(
+            "Uang saya paling banyak "
+            "habis di mana?",
+            use_container_width=True,
+        )
+
+    with suggestion_column_2:
+        suggestion_2 = st.button(
+            "Berapa laba saya "
+            "saat ini?",
+            use_container_width=True,
+        )
+
+    with suggestion_column_3:
+        suggestion_3 = st.button(
+            "Apakah kondisi keuangan "
+            "saya sehat?",
+            use_container_width=True,
+        )
+
+
+    if suggestion_1:
+        st.session_state.chat_question = (
+            "Uang saya paling banyak "
+            "habis di mana?"
+        )
+        st.session_state.chat_answer = ""
+        st.rerun()
+
+    if suggestion_2:
+        st.session_state.chat_question = (
+            "Berapa laba saya saat ini?"
+        )
+        st.session_state.chat_answer = ""
+        st.rerun()
+
+    if suggestion_3:
+        st.session_state.chat_question = (
+            "Apakah kondisi keuangan "
+            "saya sehat?"
+        )
+        st.session_state.chat_answer = ""
+        st.rerun()
+
+
+    chat_question = st.text_input(
+        "Pertanyaan kamu",
+        key="chat_question",
+        placeholder=(
+            "Contoh: kategori pengeluaran "
+            "terbesar saya apa?"
+        ),
+        max_chars=MAX_CHAT_LENGTH,
+    )
+
+    ask_button = st.button(
+        "🤖 Tanya AI",
+        type="primary",
+        use_container_width=True,
+    )
+
+
+    if ask_button:
+        now = time.time()
+
+        seconds_since_last_chat = (
+            now
+            - st.session_state
+            .last_chat_request_time
+        )
+
+        if (
+            seconds_since_last_chat
+            < RATE_LIMIT_SECONDS
+        ):
+            st.warning(
+                "Mohon tunggu beberapa detik "
+                "sebelum bertanya lagi."
+            )
+
+        elif not chat_question.strip():
+            st.warning(
+                "Tulis pertanyaan terlebih "
+                "dahulu."
+            )
+
+        else:
+            try:
+                api_key = st.secrets[
+                    "GEMINI_API_KEY"
+                ]
+
+            except (
+                FileNotFoundError,
+                KeyError,
+            ):
+                st.error(
+                    "GEMINI_API_KEY belum "
+                    "dipasang di Streamlit "
+                    "Secrets."
+                )
+
+            else:
+                safe_chat_question = (
+                    chat_question
+                    .strip()
+                    [:MAX_CHAT_LENGTH]
+                )
+
+                try:
+                    st.session_state.last_chat_request_time = (
+                        now
+                    )
+
+                    with st.spinner(
+                        "CatatCuan AI sedang "
+                        "menganalisis keuanganmu..."
+                    ):
+                        answer = (
+                            ask_financial_assistant(
+                                api_key=api_key,
+                                question=(
+                                    safe_chat_question
+                                ),
+                                transactions=(
+                                    st.session_state
+                                    .transactions
+                                ),
+                            )
+                        )
+
+                    st.session_state.chat_answer = (
+                        answer
+                    )
+
+                except Exception as error:
+                    st.error(
+                        "CatatCuan AI gagal "
+                        "menjawab. Silakan coba "
+                        "kembali."
+                    )
+
+                    if DEBUG_MODE:
+                        with st.expander(
+                            "Lihat detail error"
+                        ):
+                            st.code(
+                                redact_secret_like_strings(
+                                    str(error),
+                                    api_key,
+                                )
+                            )
+
+
+    if st.session_state.chat_answer:
+        st.markdown(
+            """
+            <div class="chat-answer">
+                <div class="chat-answer-title">
+                    🤖 Jawaban CatatCuan AI
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            st.session_state.chat_answer
+        )
+
 
 else:
     st.markdown("---")
 
     st.info(
         "Belum ada transaksi dalam riwayat. "
-        "Masukkan transaksi pertama kamu di atas."
+        "Masukkan transaksi pertama kamu "
+        "di atas."
     )
 
 
+# ── Footer ───────────────────────────────────────────────────────────
 st.divider()
 
 st.caption(
-    "CatatCuan AI adalah MVP. Periksa kembali hasil "
-    "pencatatan sebelum mengambil keputusan keuangan."
+    "CatatCuan AI adalah MVP. "
+    "Periksa kembali hasil pencatatan "
+    "sebelum mengambil keputusan keuangan."
 )
