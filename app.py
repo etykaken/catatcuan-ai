@@ -74,12 +74,12 @@ def validate_transactions(raw_transactions: list) -> list:
 
 st.set_page_config(
     page_title="CatatCuan AI",
-    page_icon="favicon.png",
+    page_icon="assets/favicon.png",
     layout="wide",
 )
 
 st.image(
-    "logo.png",
+    "assets/logo.png",
     width=380,
 )
 
