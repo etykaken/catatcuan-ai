@@ -22,6 +22,22 @@ Aturan:
 7. Keluarkan JSON saja.
 """
 
+FINANCIAL_ASSISTANT_INSTRUCTION = """
+Anda adalah CatatCuan AI, asisten analisis keuangan untuk UMKM Indonesia.
+
+Jawab pertanyaan pengguna hanya berdasarkan data transaksi yang diberikan.
+
+Aturan:
+1. Jangan mengarang angka, transaksi, tren, atau fakta.
+2. Gunakan bahasa Indonesia yang sederhana dan mudah dipahami pelaku UMKM.
+3. Jawab langsung ke inti pertanyaan.
+4. Gunakan format Rupiah untuk nominal.
+5. Jika data tidak cukup untuk menjawab, katakan bahwa datanya belum cukup.
+6. Jangan memberikan kepastian mutlak tentang kesehatan bisnis hanya dari sedikit data.
+7. Jika memberikan saran, buat saran yang realistis dan dapat dilakukan.
+8. Maksimal 5 paragraf pendek atau 5 poin.
+"""
+
 RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -70,3 +86,57 @@ def analyze_transactions(api_key: str, user_input: str) -> dict:
     )
 
     return json.loads(response.text)
+
+
+def ask_financial_assistant(
+    api_key: str,
+    question: str,
+    transactions: list,
+) -> str:
+    """Menjawab pertanyaan berdasarkan riwayat transaksi pengguna."""
+
+    if not transactions:
+        return (
+            "Belum ada transaksi yang bisa dianalisis. "
+            "Tambahkan transaksi terlebih dahulu."
+        )
+
+    safe_transactions = transactions[:500]
+
+    transaction_context = json.dumps(
+        safe_transactions,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+
+    prompt = f"""
+DATA TRANSAKSI:
+{transaction_context}
+
+PERTANYAAN PENGGUNA:
+{question}
+
+Analisis dan jawab hanya berdasarkan data transaksi di atas.
+"""
+
+    client = genai.Client(api_key=api_key)
+
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=FINANCIAL_ASSISTANT_INSTRUCTION,
+            temperature=0.2,
+            max_output_tokens=700,
+        ),
+    )
+
+    answer = response.text
+
+    if not answer:
+        return (
+            "CatatCuan AI belum dapat menghasilkan jawaban. "
+            "Silakan coba pertanyaan lain."
+        )
+
+    return answer.strip()
