@@ -180,7 +180,34 @@ if analyze_button:
             "Selisih",
             format_rupiah(balance),
         )
+        st.subheader("💡 Insight Keuangan")
 
+        if balance > 0:
+            st.success(
+                f"Arus kas positif sebesar "
+                f"{format_rupiah(balance)}."
+            )
+        elif balance < 0:
+            st.warning(
+                f"Pengeluaran melebihi pemasukan sebesar "
+                f"{format_rupiah(abs(balance))}."
+            )
+        else:
+            st.info(
+                "Pemasukan dan pengeluaran berada "
+                "pada jumlah yang sama."
+            )
+
+        if total_income > 0:
+            st.write(
+                f"Pengeluaran menggunakan "
+                f"{expense_ratio:.1f}% dari total pemasukan."
+            )
+        elif total_expense > 0:
+            st.write(
+                "Belum ada pemasukan yang tercatat, "
+                "tetapi sudah terdapat pengeluaran."
+            )
         st.subheader("Hasil Pencatatan")
 
         display_dataframe = dataframe.copy()
