@@ -64,8 +64,10 @@ def validate_transactions(raw_transactions: list) -> list:
                     item.get("description", "")
                 ).strip()[:120],
                 "Nominal": amount,
-                "Perlu Konfirmasi": bool(
-                    item.get("requires_confirmation", False)
+                "Perlu Konfirmasi": (
+                    "Ya"
+                    if item.get("requires_confirmation", False)
+                    else "Tidak"
                 ),
             }
         )
