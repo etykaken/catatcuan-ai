@@ -190,7 +190,33 @@ if analyze_button:
             use_container_width=True,
             hide_index=True,
         )
+excel_buffer = BytesIO()
 
+with pd.ExcelWriter(
+    excel_buffer,
+    engine="openpyxl",
+) as writer:
+    dataframe.to_excel(
+        writer,
+        index=False,
+        sheet_name="Laporan"
+    )
+
+excel_buffer.seek(0)
+
+st.download_button(
+    label="📥 Download Laporan Excel",
+    data=excel_buffer,
+    file_name=(
+        f"CatatCuanAI_"
+        f"{date.today().isoformat()}.xlsx"
+    ),
+    mime=(
+        "application/vnd.openxmlformats-"
+        "officedocument.spreadsheetml.sheet"
+    ),
+    use_container_width=True,
+)
         confirmation_count = int(
             dataframe["Perlu Konfirmasi"].sum()
         )
