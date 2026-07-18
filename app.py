@@ -86,7 +86,18 @@ st.image(
     width=380,
 )
 
+st.image(
+    "assets/logo.png",
+    width=380,
+)
+
 st.caption("Catat keuangan semudah bercerita.")
+
+# ==========================
+# Session transaksi
+# ==========================
+if "transactions" not in st.session_state:
+    st.session_state.transactions = []
 
 st.info(
     "Contoh: Hari ini jual kopi Rp300.000, "
