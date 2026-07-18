@@ -74,11 +74,15 @@ def validate_transactions(raw_transactions: list) -> list:
 
 st.set_page_config(
     page_title="CatatCuan AI",
-    page_icon="💰",
+    page_icon="favicon.png",
     layout="wide",
 )
 
-st.title("💰 CatatCuan AI")
+st.image(
+    "logo.png",
+    width=380,
+)
+
 st.caption("Catat keuangan semudah bercerita.")
 
 st.info(
