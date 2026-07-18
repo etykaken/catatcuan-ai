@@ -254,7 +254,7 @@ if analyze_button:
         )
 
         confirmation_count = int(
-            dataframe["Perlu Konfirmasi"].sum()
+            dataframe["Perlu Konfirmasi"] =="Ya").sum()
         )
         if confirmation_count > 0:
             st.warning(
