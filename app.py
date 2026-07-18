@@ -185,7 +185,7 @@ if analyze_button:
             )
         )
 
-                st.dataframe(
+        st.dataframe(
             display_dataframe,
             use_container_width=True,
             hide_index=True,
