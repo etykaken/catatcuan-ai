@@ -8,9 +8,7 @@ MODEL_NAME = "gemini-3.5-flash"
 
 SYSTEM_INSTRUCTION = """
 Anda adalah CatatCuan AI, asisten pencatatan keuangan untuk UMKM Indonesia.
-
 Ubah cerita transaksi pengguna menjadi JSON terstruktur.
-
 Aturan:
 1. Ambil semua transaksi yang disebutkan.
 2. Jangan mengarang transaksi atau nominal.
@@ -24,9 +22,7 @@ Aturan:
 
 FINANCIAL_ASSISTANT_INSTRUCTION = """
 Anda adalah CatatCuan AI, asisten analisis keuangan untuk UMKM Indonesia.
-
 Jawab pertanyaan pengguna hanya berdasarkan data transaksi yang diberikan.
-
 Aturan:
 1. Jangan mengarang angka, transaksi, tren, atau fakta.
 2. Gunakan bahasa Indonesia yang sederhana dan mudah dipahami pelaku UMKM.
@@ -71,6 +67,44 @@ RESPONSE_SCHEMA = {
 }
 
 
+class GeminiServiceError(Exception):
+    """Error khusus service Gemini, dengan pesan yang lebih jelas dari
+    exception mentah SDK. Memudahkan debugging tanpa membocorkan detail
+    internal ke end user (app.py tetap menampilkan pesan generik ke user,
+    tapi pesan di sini lebih berguna saat DEBUG_MODE aktif)."""
+
+
+def _extract_text_or_raise(response, context: str) -> str:
+    """Ambil teks dari response Gemini, dengan validasi eksplisit.
+
+    Tanpa fungsi ini, response yang kosong/terpotong (misalnya karena
+    thinking token menghabiskan budget max_output_tokens, atau konten
+    diblokir filter keamanan) akan membuat `json.loads(None)` melempar
+    TypeError yang membingungkan. Di sini errornya dibuat jelas.
+    """
+    candidates = getattr(response, "candidates", None)
+
+    if not candidates:
+        raise GeminiServiceError(
+            f"{context}: tidak ada kandidat respons dari Gemini "
+            "(kemungkinan diblokir filter keamanan)."
+        )
+
+    finish_reason = getattr(candidates[0], "finish_reason", None)
+
+    text = response.text
+
+    if not text:
+        raise GeminiServiceError(
+            f"{context}: respons kosong dari Gemini "
+            f"(finish_reason={finish_reason}). Ini sering terjadi karena "
+            "token 'thinking' menghabiskan budget max_output_tokens — "
+            "coba naikkan max_output_tokens atau turunkan thinking_level."
+        )
+
+    return text
+
+
 def analyze_transactions(api_key: str, user_input: str) -> dict:
     client = genai.Client(api_key=api_key)
 
@@ -81,11 +115,29 @@ def analyze_transactions(api_key: str, user_input: str) -> dict:
             system_instruction=SYSTEM_INSTRUCTION,
             response_mime_type="application/json",
             response_schema=RESPONSE_SCHEMA,
-            max_output_tokens=1200,
+            # Tugas ini ekstraksi terstruktur sederhana yang sudah
+            # dikunci oleh response_schema — tidak butuh reasoning
+            # panjang. Thinking dimatikan (level rendah) supaya seluruh
+            # token output dipakai untuk hasil JSON, bukan "mikir".
+            thinking_config=types.ThinkingConfig(
+                thinking_level="low",
+            ),
+            # Dinaikkan dari 1200 sebagai buffer aman untuk input
+            # dengan banyak transaksi sekaligus.
+            max_output_tokens=2048,
+            temperature=0.1,
         ),
     )
 
-    return json.loads(response.text)
+    raw_text = _extract_text_or_raise(response, "analyze_transactions")
+
+    try:
+        return json.loads(raw_text)
+    except json.JSONDecodeError as error:
+        raise GeminiServiceError(
+            f"analyze_transactions: gagal mem-parsing JSON dari Gemini "
+            f"({error})."
+        ) from error
 
 
 def ask_financial_assistant(
@@ -94,7 +146,6 @@ def ask_financial_assistant(
     transactions: list,
 ) -> str:
     """Menjawab pertanyaan berdasarkan riwayat transaksi pengguna."""
-
     if not transactions:
         return (
             "Belum ada transaksi yang bisa dianalisis. "
@@ -127,16 +178,15 @@ Analisis dan jawab hanya berdasarkan data transaksi di atas.
         config=types.GenerateContentConfig(
             system_instruction=FINANCIAL_ASSISTANT_INSTRUCTION,
             temperature=0.2,
-            max_output_tokens=700,
+            # Butuh sedikit reasoning untuk insight kualitatif, tapi
+            # tetap dibatasi supaya tidak menghabiskan budget output.
+            thinking_config=types.ThinkingConfig(
+                thinking_level="low",
+            ),
+            max_output_tokens=1200,
         ),
     )
 
-    answer = response.text
-
-    if not answer:
-        return (
-            "CatatCuan AI belum dapat menghasilkan jawaban. "
-            "Silakan coba pertanyaan lain."
-        )
+    answer = _extract_text_or_raise(response, "ask_financial_assistant")
 
     return answer.strip()
