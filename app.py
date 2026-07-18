@@ -158,7 +158,12 @@ if analyze_button:
         )
 
         balance = total_income - total_expense
-
+        if total_income > 0:
+            expense_ratio = (
+                total_expense / total_income
+            ) * 100
+        else:
+            expense_ratio = 0
         col1, col2, col3 = st.columns(3)
 
         col1.metric(
