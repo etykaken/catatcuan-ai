@@ -81,10 +81,6 @@ st.set_page_config(
     layout="wide",
 )
 
-st.image(
-    "assets/logo.png",
-    width=380,
-)
 
 st.image(
     "assets/logo.png",
