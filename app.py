@@ -1,28 +1,19 @@
-import re
-import time
-from datetime import date, timedelta
-from io import BytesIO
+"""
+app.py — Entry point CatatCuan AI.
+
+Bertanggung jawab untuk:
+1. Konfigurasi halaman & CSS global (dipakai di semua halaman karena
+   script ini selalu dijalankan ulang sebelum pg.run()).
+2. Inisialisasi session_state (sekali, dan konsisten di semua halaman).
+3. Sidebar branding (logo, kartu upgrade, versi).
+4. Navigasi multi-halaman lewat st.navigation + st.Page.
+"""
 from pathlib import Path
 
-import pandas as pd
 import streamlit as st
 
-from services.gemini_service import (
-    analyze_transactions,
-    ask_financial_assistant,
-)
-
-# ── Konfigurasi & Konstanta Keamanan ────────────────────────────────
-MAX_INPUT_LENGTH = 1000
-MAX_CHAT_LENGTH = 500
-MAX_AMOUNT = 10_000_000_000
-MAX_TRANSACTIONS_PER_REQUEST = 50
-MAX_TOTAL_TRANSACTIONS = 5000
-RATE_LIMIT_SECONDS = 3
-
-ISO_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-FORMULA_TRIGGER_CHARS = ("=", "+", "-", "@", "\t", "\r")
-SECRET_LIKE_PATTERN = re.compile(r"(sk-[A-Za-z0-9\-_]{10,}|AIza[A-Za-z0-9\-_]{20,})")
+import dashboard
+from pages import ai_chat, ai_insight, laporan, pengaturan, transaksi
 
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 FAVICON_PATH = ASSETS_DIR / "favicon.png"
@@ -31,124 +22,6 @@ try:
     DEBUG_MODE = bool(st.secrets.get("DEBUG_MODE", False))
 except (FileNotFoundError, KeyError):
     DEBUG_MODE = False
-
-
-def resolve_date(value: str) -> str:
-    today = date.today()
-    normalized = str(value).strip().upper()
-    if normalized == "TODAY":
-        return today.isoformat()
-    if normalized == "YESTERDAY":
-        return (today - timedelta(days=1)).isoformat()
-    if normalized == "TOMORROW":
-        return (today + timedelta(days=1)).isoformat()
-    candidate = str(value).strip()
-    if ISO_DATE_PATTERN.match(candidate):
-        try:
-            date.fromisoformat(candidate)
-            return candidate
-        except ValueError:
-            pass
-    return today.isoformat()
-
-
-def format_rupiah(value: int | float) -> str:
-    return f"Rp{value:,.0f}".replace(",", ".")
-
-
-def coerce_amount(raw_amount) -> int | None:
-    if isinstance(raw_amount, bool):
-        return None
-    if isinstance(raw_amount, int):
-        return raw_amount
-    if isinstance(raw_amount, float):
-        return int(raw_amount) if raw_amount.is_integer() else None
-    if isinstance(raw_amount, str):
-        cleaned = raw_amount.strip().replace(".", "").replace(",", "")
-        return int(cleaned) if cleaned.isdigit() else None
-    return None
-
-
-def sanitize_text_field(value, max_length: int) -> str:
-    text = "".join(ch for ch in str(value).strip() if ch.isprintable() or ch == "\n")
-    return text[:max_length]
-
-
-def sanitize_excel_cell(text: str) -> str:
-    text = str(text)
-    return "'" + text if text.startswith(FORMULA_TRIGGER_CHARS) else text
-
-
-def validate_transactions(raw_transactions: list) -> list:
-    validated = []
-    if not isinstance(raw_transactions, list):
-        return validated
-    for item in raw_transactions[:MAX_TRANSACTIONS_PER_REQUEST]:
-        if not isinstance(item, dict) or item.get("type") not in {"income", "expense"}:
-            continue
-        amount = coerce_amount(item.get("amount"))
-        if amount is None or amount <= 0 or amount > MAX_AMOUNT:
-            continue
-        validated.append({
-            "Tanggal": resolve_date(item.get("date", "TODAY")),
-            "Jenis": "Pemasukan" if item["type"] == "income" else "Pengeluaran",
-            "Kategori": sanitize_excel_cell(sanitize_text_field(item.get("category", ""), 60)),
-            "Keterangan": sanitize_excel_cell(sanitize_text_field(item.get("description", ""), 120)),
-            "Nominal": amount,
-            "Perlu Konfirmasi": "Ya" if item.get("requires_confirmation", False) else "Tidak",
-        })
-    return validated
-
-
-def redact_secret_like_strings(text: str, api_key: str | None = None) -> str:
-    if api_key:
-        text = text.replace(api_key, "[REDACTED]")
-    return SECRET_LIKE_PATTERN.sub("[REDACTED]", text)
-
-
-def create_excel_report(dataframe, total_income, total_expense, net_result, expense_ratio) -> BytesIO:
-    buffer = BytesIO()
-    summary = pd.DataFrame({
-        "Keterangan": [
-            "Total Pemasukan", "Total Pengeluaran", "Laba/Rugi Bersih",
-            "Status Keuangan", "Rasio Pengeluaran", "Jumlah Transaksi", "Tanggal Laporan",
-        ],
-        "Nilai": [
-            total_income, total_expense, net_result,
-            "Laba" if net_result > 0 else "Rugi" if net_result < 0 else "Impas",
-            f"{expense_ratio:.1f}%", len(dataframe), date.today().isoformat(),
-        ],
-    })
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        dataframe.to_excel(writer, index=False, sheet_name="Transaksi")
-        summary.to_excel(writer, index=False, sheet_name="Ringkasan Keuangan")
-        ws = writer.book["Transaksi"]
-        sws = writer.book["Ringkasan Keuangan"]
-        for col, width in {"A": 15, "B": 18, "C": 22, "D": 40, "E": 18, "F": 20}.items():
-            ws.column_dimensions[col].width = width
-        sws.column_dimensions["A"].width = 25
-        sws.column_dimensions["B"].width = 25
-        for cell in ws[1]:
-            cell.font = cell.font.copy(bold=True)
-        for cell in sws[1]:
-            cell.font = cell.font.copy(bold=True)
-        for row in range(2, ws.max_row + 1):
-            ws[f"E{row}"].number_format = '"Rp"#,##0'
-        for cell in ("B2", "B3", "B4"):
-            sws[cell].number_format = '"Rp"#,##0'
-        ws.freeze_panes = "A2"
-        sws.freeze_panes = "A2"
-    buffer.seek(0)
-    return buffer
-
-
-def metric_card(label: str, value: str, icon: str, extra: str = ""):
-    st.markdown(
-        f'''<div class="metric-card {extra}"><div><div class="metric-label">{label}</div>'''
-        f'''<div class="metric-value">{value}</div></div><div class="metric-icon">{icon}</div></div>''',
-        unsafe_allow_html=True,
-    )
-
 
 # ── Konfigurasi Halaman ──────────────────────────────────────────────
 st.set_page_config(
@@ -164,7 +37,7 @@ st.markdown('''
 html,body,[class*="css"]{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}.stApp{background:#f7faf8}.block-container{max-width:1320px;padding-top:1.5rem;padding-bottom:4rem}
 [data-testid="stSidebar"]{background:linear-gradient(180deg,#f4fbf6,#edf7f0);border-right:1px solid var(--line)}[data-testid="stSidebar"] .block-container{padding:1.4rem 1rem}
 .brand{display:flex;align-items:center;gap:10px;padding:5px 5px 20px}.brand-mark{width:43px;height:43px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,#20a65e,#11723f);font-size:22px;box-shadow:0 8px 20px #168a4d38}.brand-title{font-size:18px;font-weight:900;color:var(--ink)}.brand-sub{font-size:11px;color:var(--muted)}
-.side-label{font-size:10px;letter-spacing:.12em;color:#91a096;font-weight:800;padding:13px 10px 6px}.nav{padding:11px 12px;margin:3px 0;border-radius:12px;color:#526058;font-size:14px;font-weight:650}.nav.active{background:#dff2e6;color:#10683a}.upgrade{margin-top:25px;padding:16px;border-radius:16px;background:linear-gradient(145deg,#174c32,#0f3825);color:white}.upgrade b{font-size:14px}.upgrade p{font-size:11px;line-height:1.5;color:#cbe3d3}.version{margin-top:20px;color:#8b9890;font-size:11px}
+.side-label{font-size:10px;letter-spacing:.12em;color:#91a096;font-weight:800;padding:13px 10px 6px}.upgrade{margin-top:14px;padding:16px;border-radius:16px;background:linear-gradient(145deg,#174c32,#0f3825);color:white}.upgrade b{font-size:14px}.upgrade p{font-size:11px;line-height:1.5;color:#cbe3d3}.version{margin-top:20px;color:#8b9890;font-size:11px}
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.kicker{font-size:13px;color:var(--muted)}.page-title{font-size:28px;font-weight:900;color:var(--ink);letter-spacing:-.03em}.profile{display:flex;align-items:center;gap:9px;padding:7px 11px 7px 8px;border:1px solid var(--line);border-radius:999px;background:white}.avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#dff2e6}.profile-name{font-size:12px;font-weight:800}
 .hero{display:flex;justify-content:space-between;align-items:center;min-height:230px;padding:34px 38px;margin-bottom:24px;border:1px solid #dceae1;border-radius:24px;background:radial-gradient(circle at 88% 20%,#4bbe7833,transparent 28%),linear-gradient(135deg,#fff,#effaf3);box-shadow:0 16px 40px #1e52330f;overflow:hidden}.hero-copy{max-width:720px}.eyebrow{font-size:13px;font-weight:850;letter-spacing:.08em;color:var(--green);text-transform:uppercase;margin-bottom:10px}.hero-title{font-size:40px;line-height:1.08;font-weight:950;color:var(--ink);letter-spacing:-.045em}.hero-title span{display:block;color:var(--green)}.hero-sub{font-size:15px;line-height:1.65;color:var(--muted);margin-top:14px;max-width:650px}.hero-art{position:relative;width:300px;height:180px;min-width:300px}.panel{position:absolute;inset:13px 16px 15px;background:#ffffffd9;border:1px solid #d2e6d9;border-radius:20px;transform:rotate(-2deg);box-shadow:0 14px 30px #1e5c391a}.bars{position:absolute;left:43px;bottom:39px;height:86px;display:flex;align-items:flex-end;gap:11px;z-index:2}.bar{width:21px;border-radius:7px 7px 3px 3px;background:#a2ddb7}.bar:nth-child(1){height:36px}.bar:nth-child(2){height:58px}.bar:nth-child(3){height:45px}.bar:nth-child(4){height:78px;background:var(--green)}.robot{position:absolute;right:37px;bottom:35px;font-size:66px;z-index:3}
 .section-title{font-size:18px;font-weight:900;color:var(--ink);margin:4px 0 12px}[data-testid="stVerticalBlockBorderWrapper"]{background:white;border:1px solid var(--line);border-radius:18px;box-shadow:0 10px 28px #19442c0e}.tabs{display:flex;gap:26px;border-bottom:1px solid var(--line);padding:2px 2px 12px;margin-bottom:8px;color:#728078;font-size:13px;font-weight:800}.tab-active{color:var(--green);position:relative}.tab-active:after{content:"";position:absolute;left:0;right:0;bottom:-13px;height:2px;background:var(--green)}.stTextArea textarea{min-height:138px;border-radius:14px;border:1px solid #d9e5dd;background:#fbfdfb;font-size:15px;padding:15px}.stTextArea textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px #168a4d1f}.stTextInput input{border-radius:12px;min-height:46px;border:1px solid #d9e5dd;background:#fbfdfb}.stTextInput input:focus{border-color:var(--green);box-shadow:0 0 0 3px #168a4d1f}.stButton button[kind="primary"]{min-height:48px;border:none;border-radius:12px;color:white;font-weight:850;background:linear-gradient(90deg,#168a4d,#20a65e)}.stButton button:not([kind="primary"]){min-height:48px;border-radius:12px;border:1px solid #d8e3dc;background:white;color:#536158;font-weight:750}
@@ -174,7 +47,7 @@ html,body,[class*="css"]{font-family:Inter,ui-sans-serif,system-ui,-apple-system
 </style>
 ''', unsafe_allow_html=True)
 
-# ── Session State ────────────────────────────────────────────────────
+# ── Session State (dipusatkan di sini, konsisten di semua halaman) ──
 if "transactions" not in st.session_state:
     st.session_state.transactions = []
 if "last_request_time" not in st.session_state:
@@ -185,209 +58,40 @@ if "chat_question" not in st.session_state:
     st.session_state.chat_question = ""
 if "chat_answer" not in st.session_state:
     st.session_state.chat_answer = ""
+st.session_state.debug_mode = DEBUG_MODE
 
-# ── Sidebar (navigasi masih tahap penyelesaian — belum fungsional) ──
+# ── Sidebar branding (nav fungsional di-generate otomatis oleh
+#    st.navigation di bawah — bagian ini cuma header + kartu promo) ──
 with st.sidebar:
-    st.markdown('''<div class="brand"><div class="brand-mark">🤖</div><div><div class="brand-title">CatatCuan AI</div><div class="brand-sub">AI Financial Assistant</div></div></div><div class="side-label">MENU UTAMA</div><div class="nav active">🏠 &nbsp; Dashboard</div><div class="nav">🧾 &nbsp; Transaksi</div><div class="nav">✨ &nbsp; AI Insight</div><div class="nav">💬 &nbsp; AI Chat</div><div class="nav">📄 &nbsp; Laporan</div><div class="side-label">LAINNYA</div><div class="nav">⚙️ &nbsp; Pengaturan</div><div class="upgrade"><b>👑 Upgrade ke Pro</b><p>Multi-user, laporan lanjutan, dan insight bisnis yang lebih lengkap akan hadir berikutnya.</p></div><div class="version">CatatCuan AI · v1.0.0</div>''', unsafe_allow_html=True)
-
-st.markdown('''<div class="topbar"><div><div class="kicker">Dashboard keuangan usaha</div><div class="page-title">Selamat datang, Etyka! 👋</div></div><div class="profile"><div class="avatar">👩🏻</div><div class="profile-name">Etyka K.</div><div>⌄</div></div></div><div class="hero"><div class="hero-copy"><div class="eyebrow">CatatCuan AI</div><div class="hero-title">Catat pemasukan & pengeluaran<span>semudah bercerita</span></div><div class="hero-sub">AI membantu membaca transaksi, menyusunnya menjadi catatan keuangan, dan memberikan gambaran kondisi usaha dalam satu dashboard.</div></div><div class="hero-art"><div class="panel"></div><div class="bars"><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div></div><div class="robot">🤖</div></div></div>''', unsafe_allow_html=True)
-
-if st.session_state.transactions:
-    dataframe = pd.DataFrame(st.session_state.transactions)
-    total_income = int(dataframe.loc[dataframe["Jenis"] == "Pemasukan", "Nominal"].sum())
-    total_expense = int(dataframe.loc[dataframe["Jenis"] == "Pengeluaran", "Nominal"].sum())
-else:
-    dataframe = pd.DataFrame()
-    total_income = total_expense = 0
-net_result = total_income - total_expense
-expense_ratio = (total_expense / total_income * 100) if total_income > 0 else 0
-
-input_col, summary_col = st.columns([2.15, 1], gap="large")
-with input_col:
-    st.markdown('<div class="section-title">Catat transaksi baru</div>', unsafe_allow_html=True)
-    with st.container(border=True):
-        st.markdown('<div class="tabs"><div class="tab-active">✍️ Tulis Transaksi</div><div>📷 Upload Nota</div></div>', unsafe_allow_html=True)
-        user_input = st.text_area(
-            "Ceritakan transaksi usaha kamu",
-            placeholder="Contoh: Hari ini jual kopi Rp300.000, beli susu Rp80.000, dan bayar parkir Rp5.000.",
-            height=138,
-            max_chars=MAX_INPUT_LENGTH,
-            label_visibility="collapsed",
-        )
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            analyze_button = st.button("✨ Analisis & Tambahkan Transaksi", type="primary", use_container_width=True)
-        with c2:
-            clear_button = st.button("🗑️ Hapus Semua", use_container_width=True)
-with summary_col:
-    st.markdown('<div class="section-title">Ringkasan Keuangan</div>', unsafe_allow_html=True)
-    metric_card("Total Pemasukan", format_rupiah(total_income), "↗️")
-    metric_card("Total Pengeluaran", format_rupiah(total_expense), "↘️", "negative")
-    # Fix poin 1: gaya kartu sekarang ikut kondisi untung/rugi, bukan selalu "profit".
-    metric_card(
-        "Laba Bersih" if net_result >= 0 else "Kerugian",
-        format_rupiah(net_result if net_result >= 0 else abs(net_result)),
-        "💰",
-        "profit" if net_result >= 0 else "negative",
+    st.markdown(
+        '''<div class="brand">
+            <div class="brand-mark">🤖</div>
+            <div>
+                <div class="brand-title">CatatCuan AI</div>
+                <div class="brand-sub">AI Financial Assistant</div>
+            </div>
+        </div>''',
+        unsafe_allow_html=True,
     )
 
-if clear_button:
-    st.session_state.transactions = []
-    st.session_state.chat_question = ""
-    st.session_state.chat_answer = ""
-    st.rerun()
+# ── Navigasi Multi-Halaman ───────────────────────────────────────────
+pg = st.navigation(
+    [
+        st.Page(dashboard.render, title="Dashboard", icon="🏠", default=True, url_path="dashboard"),
+        st.Page(transaksi.render, title="Transaksi", icon="🧾", url_path="transaksi"),
+        st.Page(ai_insight.render, title="AI Insight", icon="✨", url_path="ai-insight"),
+        st.Page(ai_chat.render, title="AI Chat", icon="💬", url_path="ai-chat"),
+        st.Page(laporan.render, title="Laporan", icon="📄", url_path="laporan"),
+        st.Page(pengaturan.render, title="Pengaturan", icon="⚙️", url_path="pengaturan"),
+    ]
+)
 
-if analyze_button:
-    now = time.time()
-    if now - st.session_state.last_request_time < RATE_LIMIT_SECONDS:
-        st.warning("Mohon tunggu beberapa detik sebelum mengirim permintaan berikutnya.")
-    elif not user_input.strip():
-        st.warning("Tulis transaksi terlebih dahulu.")
-    else:
-        try:
-            api_key = st.secrets["GEMINI_API_KEY"]
-        except (FileNotFoundError, KeyError):
-            st.error("GEMINI_API_KEY belum dipasang di Streamlit Secrets.")
-        else:
-            try:
-                st.session_state.last_request_time = now
-                with st.spinner("CatatCuan AI sedang membaca transaksi..."):
-                    result = analyze_transactions(api_key=api_key, user_input=user_input.strip()[:MAX_INPUT_LENGTH])
-                new_transactions = validate_transactions(result.get("transactions", []) if isinstance(result, dict) else [])
-                if not new_transactions:
-                    st.warning("Tidak ditemukan transaksi yang dapat dicatat.")
-                else:
-                    remaining = MAX_TOTAL_TRANSACTIONS - len(st.session_state.transactions)
-                    if remaining <= 0:
-                        st.warning(f"Riwayat transaksi sudah mencapai batas maksimum ({MAX_TOTAL_TRANSACTIONS}).")
-                    else:
-                        if len(new_transactions) > remaining:
-                            new_transactions = new_transactions[:remaining]
-                            st.warning(f"Sebagian transaksi tidak ditambahkan karena riwayat sudah mendekati batas maksimum ({MAX_TOTAL_TRANSACTIONS}).")
-                        st.session_state.transactions.extend(new_transactions)
-                        st.session_state.chat_answer = ""
-                        st.success(f"{len(new_transactions)} transaksi berhasil ditambahkan.")
-                        st.rerun()
-            except Exception as error:
-                st.error("Transaksi gagal diproses. Silakan coba kembali.")
-                if DEBUG_MODE:
-                    with st.expander("Lihat detail error"):
-                        st.code(redact_secret_like_strings(str(error), api_key))
+with st.sidebar:
+    st.markdown(
+        '''<div class="upgrade"><b>👑 Upgrade ke Pro</b>
+        <p>Multi-user, laporan lanjutan, dan insight bisnis yang lebih lengkap akan hadir berikutnya.</p>
+        </div><div class="version">CatatCuan AI · v1.0.0</div>''',
+        unsafe_allow_html=True,
+    )
 
-st.markdown("<br>", unsafe_allow_html=True)
-insight_col, chart_col = st.columns([1.2, 1], gap="large")
-with insight_col:
-    st.markdown('<div class="section-title">✨ AI Insight</div>', unsafe_allow_html=True)
-    if not st.session_state.transactions:
-        title, copy = "Mulai dari transaksi pertama", "Ceritakan pemasukan atau pengeluaran menggunakan bahasa sehari-hari. Dashboard akan diperbarui otomatis."
-    elif net_result > 0:
-        title, copy = "Usaha sedang mencatat laba", f"Laba bersih saat ini {format_rupiah(net_result)}. Pengeluaran memakai {expense_ratio:.1f}% dari total pemasukan."
-    elif net_result < 0:
-        title, copy = "Pengeluaran perlu diperhatikan", f"Usaha mencatat kerugian {format_rupiah(abs(net_result))}. Periksa kategori pengeluaran terbesar sebelum menambah biaya berikutnya."
-    else:
-        title, copy = "Posisi keuangan sedang impas", "Total pemasukan dan pengeluaran sama. Tambahkan transaksi berikutnya agar pola keuangan lebih terlihat."
-    st.markdown(f'<div class="insight"><div class="badge">🤖 AI FINANCIAL CHECK</div><div class="insight-title">{title}</div><div class="insight-copy">{copy}</div></div>', unsafe_allow_html=True)
-with chart_col:
-    st.markdown('<div class="section-title">Arus Keuangan</div>', unsafe_allow_html=True)
-    chart_df = pd.DataFrame({"Kategori": ["Pemasukan", "Pengeluaran"], "Nominal": [total_income, total_expense]}).set_index("Kategori")
-    st.bar_chart(chart_df, use_container_width=True, height=220)
-
-st.markdown("<br>", unsafe_allow_html=True)
-st.markdown('<div class="section-title">🧾 Transaksi Terakhir</div>', unsafe_allow_html=True)
-if st.session_state.transactions:
-    dataframe = pd.DataFrame(st.session_state.transactions)
-    display_df = dataframe.copy()
-    display_df.index = display_df.index + 1
-    display_df["Nominal"] = display_df["Nominal"].apply(format_rupiah)
-    st.dataframe(display_df, use_container_width=True, hide_index=False)
-    confirmations = int((dataframe["Perlu Konfirmasi"] == "Ya").sum())
-    status_col, export_col = st.columns([1.3, 1], gap="large")
-    with status_col:
-        if confirmations:
-            st.warning(f"{confirmations} transaksi perlu diperiksa kembali.")
-        else:
-            st.success("Semua transaksi terbaca tanpa memerlukan konfirmasi.")
-    with export_col:
-        excel_buffer = create_excel_report(dataframe, total_income, total_expense, net_result, expense_ratio)
-        st.download_button(
-            "📥 Download Laporan Excel",
-            excel_buffer,
-            file_name=f"CatatCuanAI_Laporan_{date.today().isoformat()}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
-
-    # ── AI Chat: Tanya CatatCuan AI (poin 2 — dipertahankan) ──────────
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div class="section-title">💬 Tanya CatatCuan AI</div>', unsafe_allow_html=True)
-    with st.container(border=True):
-        st.caption("Tanyakan apa saja berdasarkan transaksi yang sudah kamu catat.")
-
-        s1, s2, s3 = st.columns(3)
-        with s1:
-            suggestion_1 = st.button("Uang saya paling banyak habis di mana?", use_container_width=True)
-        with s2:
-            suggestion_2 = st.button("Berapa laba saya saat ini?", use_container_width=True)
-        with s3:
-            suggestion_3 = st.button("Apakah kondisi keuangan saya sehat?", use_container_width=True)
-
-        if suggestion_1:
-            st.session_state.chat_question = "Uang saya paling banyak habis di mana?"
-            st.session_state.chat_answer = ""
-            st.rerun()
-        if suggestion_2:
-            st.session_state.chat_question = "Berapa laba saya saat ini?"
-            st.session_state.chat_answer = ""
-            st.rerun()
-        if suggestion_3:
-            st.session_state.chat_question = "Apakah kondisi keuangan saya sehat?"
-            st.session_state.chat_answer = ""
-            st.rerun()
-
-        chat_question = st.text_input(
-            "Pertanyaan kamu",
-            key="chat_question",
-            placeholder="Contoh: kategori pengeluaran terbesar saya apa?",
-            max_chars=MAX_CHAT_LENGTH,
-            label_visibility="collapsed",
-        )
-        ask_button = st.button("🤖 Tanya AI", type="primary", use_container_width=True)
-
-        if ask_button:
-            now = time.time()
-            if now - st.session_state.last_chat_request_time < RATE_LIMIT_SECONDS:
-                st.warning("Mohon tunggu beberapa detik sebelum bertanya lagi.")
-            elif not chat_question.strip():
-                st.warning("Tulis pertanyaan terlebih dahulu.")
-            else:
-                try:
-                    api_key = st.secrets["GEMINI_API_KEY"]
-                except (FileNotFoundError, KeyError):
-                    st.error("GEMINI_API_KEY belum dipasang di Streamlit Secrets.")
-                else:
-                    safe_chat_question = chat_question.strip()[:MAX_CHAT_LENGTH]
-                    try:
-                        st.session_state.last_chat_request_time = now
-                        with st.spinner("CatatCuan AI sedang menganalisis keuanganmu..."):
-                            answer = ask_financial_assistant(
-                                api_key=api_key,
-                                question=safe_chat_question,
-                                transactions=st.session_state.transactions,
-                            )
-                        st.session_state.chat_answer = answer
-                    except Exception as error:
-                        st.error("CatatCuan AI gagal menjawab. Silakan coba kembali.")
-                        if DEBUG_MODE:
-                            with st.expander("Lihat detail error"):
-                                st.code(redact_secret_like_strings(str(error), api_key))
-
-        if st.session_state.chat_answer:
-            st.markdown('<div class="badge">🤖 Jawaban CatatCuan AI</div>', unsafe_allow_html=True)
-            # Jawaban AI ditaruh lewat st.markdown TANPA unsafe_allow_html,
-            # supaya kalau ada HTML/script hasil prompt injection di
-            # jawabannya, akan ikut di-escape (bukan dieksekusi).
-            st.markdown(st.session_state.chat_answer)
-else:
-    st.markdown('<div class="empty"><div class="empty-icon">🧾</div><strong>Belum ada transaksi</strong><br>Catat transaksi pertama kamu melalui kolom di atas.</div>', unsafe_allow_html=True)
-
-st.markdown('<div class="footer-note">CatatCuan AI adalah MVP. Periksa kembali hasil pencatatan sebelum mengambil keputusan keuangan.</div>', unsafe_allow_html=True)
+pg.run()
