@@ -989,7 +989,7 @@ st.markdown(
             <div class="robot-laptop"></div>
         </div>
     </section>
-    """,
+    """),
     unsafe_allow_html=True,
 )
 
