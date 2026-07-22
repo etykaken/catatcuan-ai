@@ -1,37 +1,36 @@
 import json
+import time
 
 from google import genai
 from google.genai import types
 
 
-MODEL_NAME = "gemini-3.5-flash"
+MODEL_NAME = "gemini-2.5-flash"
 
 SYSTEM_INSTRUCTION = """
 Anda adalah CatatCuan AI, asisten pencatatan keuangan untuk UMKM Indonesia.
-Ubah cerita transaksi pengguna menjadi JSON terstruktur.
-Aturan:
-1. Ambil semua transaksi yang disebutkan.
-2. Jangan mengarang transaksi atau nominal.
-3. Jenis transaksi hanya "income" atau "expense".
-4. Jika pengguna mengatakan "hari ini" atau tidak menyebut tanggal,
-   gunakan "TODAY".
-5. Jika pengguna mengatakan "kemarin", gunakan "YESTERDAY".
-6. Jangan menebak tanggal kalender saat ini.
-7. Keluarkan JSON saja.
+
+Tugas Anda:
+- Ubah cerita transaksi pengguna menjadi data JSON terstruktur.
+- Ambil semua transaksi yang disebutkan.
+- Jangan mengarang transaksi atau nominal.
+- Jenis transaksi hanya "income" atau "expense".
+- Jika tanggal tidak disebutkan atau pengguna mengatakan "hari ini", gunakan "TODAY".
+- Jika pengguna mengatakan "kemarin", gunakan "YESTERDAY".
+- Gunakan kategori yang singkat dan relevan.
+- Keluarkan JSON saja.
 """
 
 FINANCIAL_ASSISTANT_INSTRUCTION = """
 Anda adalah CatatCuan AI, asisten analisis keuangan untuk UMKM Indonesia.
-Jawab pertanyaan pengguna hanya berdasarkan data transaksi yang diberikan.
+
 Aturan:
-1. Jangan mengarang angka, transaksi, tren, atau fakta.
-2. Gunakan bahasa Indonesia yang sederhana dan mudah dipahami pelaku UMKM.
-3. Jawab langsung ke inti pertanyaan.
-4. Gunakan format Rupiah untuk nominal.
-5. Jika data tidak cukup untuk menjawab, katakan bahwa datanya belum cukup.
-6. Jangan memberikan kepastian mutlak tentang kesehatan bisnis hanya dari sedikit data.
-7. Jika memberikan saran, buat saran yang realistis dan dapat dilakukan.
-8. Maksimal 5 paragraf pendek atau 5 poin.
+- Jawab hanya berdasarkan data transaksi yang diberikan.
+- Jangan mengarang angka, transaksi, tren, atau fakta.
+- Gunakan bahasa Indonesia yang sederhana.
+- Gunakan format Rupiah untuk nominal.
+- Jika data belum cukup, katakan dengan jelas.
+- Maksimal 5 poin atau 5 paragraf pendek.
 """
 
 RESPONSE_SCHEMA = {
@@ -68,100 +67,111 @@ RESPONSE_SCHEMA = {
 
 
 class GeminiServiceError(Exception):
-    """Error khusus service Gemini, dengan pesan yang lebih jelas dari
-    exception mentah SDK. Memudahkan debugging tanpa membocorkan detail
-    internal ke end user (app.py tetap menampilkan pesan generik ke user,
-    tapi pesan di sini lebih berguna saat DEBUG_MODE aktif)."""
+    """Error aman untuk ditampilkan atau dicatat oleh aplikasi."""
 
 
-def _extract_text_or_raise(response, context: str) -> str:
-    """Ambil teks dari response Gemini, dengan validasi eksplisit.
-
-    Tanpa fungsi ini, response yang kosong/terpotong (misalnya karena
-    thinking token menghabiskan budget max_output_tokens, atau konten
-    diblokir filter keamanan) akan membuat `json.loads(None)` melempar
-    TypeError yang membingungkan. Di sini errornya dibuat jelas.
-    """
-    candidates = getattr(response, "candidates", None)
-
-    if not candidates:
-        raise GeminiServiceError(
-            f"{context}: tidak ada kandidat respons dari Gemini "
-            "(kemungkinan diblokir filter keamanan)."
-        )
-
-    finish_reason = getattr(candidates[0], "finish_reason", None)
-
-    text = response.text
+def _get_response_text(response, context: str) -> str:
+    text = getattr(response, "text", None)
 
     if not text:
         raise GeminiServiceError(
-            f"{context}: respons kosong dari Gemini "
-            f"(finish_reason={finish_reason}). Ini sering terjadi karena "
-            "token 'thinking' menghabiskan budget max_output_tokens — "
-            "coba naikkan max_output_tokens atau turunkan thinking_level."
+            f"{context}: Gemini tidak mengembalikan jawaban."
         )
 
-    return text
+    return text.strip()
+
+
+def _generate_with_retry(
+    client,
+    *,
+    contents: str,
+    config: types.GenerateContentConfig,
+):
+    last_error = None
+
+    for attempt in range(3):
+        try:
+            return client.models.generate_content(
+                model=MODEL_NAME,
+                contents=contents,
+                config=config,
+            )
+        except Exception as error:
+            last_error = error
+            message = str(error).lower()
+
+            temporary_error = any(
+                marker in message
+                for marker in (
+                    "503",
+                    "unavailable",
+                    "high demand",
+                    "429",
+                    "resource exhausted",
+                )
+            )
+
+            if temporary_error and attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
+                continue
+
+            break
+
+    raise GeminiServiceError(
+        "Layanan Gemini sedang sibuk. Silakan coba lagi beberapa saat."
+    ) from last_error
 
 
 def analyze_transactions(api_key: str, user_input: str) -> dict:
+    if not api_key:
+        raise GeminiServiceError("GEMINI_API_KEY belum tersedia.")
+
+    clean_input = str(user_input).strip()
+
+    if not clean_input:
+        return {"transactions": []}
+
     client = genai.Client(api_key=api_key)
 
-    import time
-
-for i in range(3):
-    try:
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=user_input,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
-                response_mime_type="application/json",
-                response_schema=RESPONSE_SCHEMA,
-                thinking_config=types.ThinkingConfig(
-                    thinking_level="low",
-                ),
-                max_output_tokens=2048,
-                temperature=0.1,
-            ),
-        )
-        break
-
-    except Exception as e:
-        if "503" in str(e) and i < 2:
-            time.sleep(2)
-            continue
-        raise
-        model=MODEL_NAME,
-        contents=user_input,
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_INSTRUCTION,
-            response_mime_type="application/json",
-            response_schema=RESPONSE_SCHEMA,
-            # Tugas ini ekstraksi terstruktur sederhana yang sudah
-            # dikunci oleh response_schema — tidak butuh reasoning
-            # panjang. Thinking dimatikan (level rendah) supaya seluruh
-            # token output dipakai untuk hasil JSON, bukan "mikir".
-            thinking_config=types.ThinkingConfig(
-                thinking_level="low",
-            ),
-            # Dinaikkan dari 1200 sebagai buffer aman untuk input
-            # dengan banyak transaksi sekaligus.
-            max_output_tokens=2048,
-            temperature=0.1,
-        ),
+    config = types.GenerateContentConfig(
+        system_instruction=SYSTEM_INSTRUCTION,
+        response_mime_type="application/json",
+        response_schema=RESPONSE_SCHEMA,
+        temperature=0.1,
+        max_output_tokens=2048,
     )
 
-    raw_text = _extract_text_or_raise(response, "analyze_transactions")
+    response = _generate_with_retry(
+        client,
+        contents=clean_input,
+        config=config,
+    )
+
+    raw_text = _get_response_text(
+        response,
+        "analyze_transactions",
+    )
 
     try:
-        return json.loads(raw_text)
+        parsed = json.loads(raw_text)
     except json.JSONDecodeError as error:
         raise GeminiServiceError(
-            f"analyze_transactions: gagal mem-parsing JSON dari Gemini "
-            f"({error})."
+            "Gemini mengembalikan format transaksi yang tidak valid."
         ) from error
+
+    if not isinstance(parsed, dict):
+        raise GeminiServiceError(
+            "Format respons transaksi tidak sesuai."
+        )
+
+    transactions = parsed.get("transactions", [])
+
+    if not isinstance(transactions, list):
+        raise GeminiServiceError(
+            "Daftar transaksi dari Gemini tidak valid."
+        )
+
+    return {"transactions": transactions}
 
 
 def ask_financial_assistant(
@@ -169,7 +179,14 @@ def ask_financial_assistant(
     question: str,
     transactions: list,
 ) -> str:
-    """Menjawab pertanyaan berdasarkan riwayat transaksi pengguna."""
+    if not api_key:
+        raise GeminiServiceError("GEMINI_API_KEY belum tersedia.")
+
+    clean_question = str(question).strip()
+
+    if not clean_question:
+        return "Silakan tulis pertanyaan terlebih dahulu."
+
     if not transactions:
         return (
             "Belum ada transaksi yang bisa dianalisis. "
@@ -188,29 +205,27 @@ def ask_financial_assistant(
 DATA TRANSAKSI:
 {transaction_context}
 
-PERTANYAAN PENGGUNA:
-{question}
+PERTANYAAN:
+{clean_question}
 
-Analisis dan jawab hanya berdasarkan data transaksi di atas.
+Jawab hanya berdasarkan data transaksi di atas.
 """
 
     client = genai.Client(api_key=api_key)
 
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=FINANCIAL_ASSISTANT_INSTRUCTION,
-            temperature=0.2,
-            # Butuh sedikit reasoning untuk insight kualitatif, tapi
-            # tetap dibatasi supaya tidak menghabiskan budget output.
-            thinking_config=types.ThinkingConfig(
-                thinking_level="low",
-            ),
-            max_output_tokens=1200,
-        ),
+    config = types.GenerateContentConfig(
+        system_instruction=FINANCIAL_ASSISTANT_INSTRUCTION,
+        temperature=0.2,
+        max_output_tokens=1200,
     )
 
-    answer = _extract_text_or_raise(response, "ask_financial_assistant")
+    response = _generate_with_retry(
+        client,
+        contents=prompt,
+        config=config,
+    )
 
-    return answer.strip()
+    return _get_response_text(
+        response,
+        "ask_financial_assistant",
+    )
