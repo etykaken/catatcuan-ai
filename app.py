@@ -1076,7 +1076,7 @@ with left_column:
 with right_column:
     with st.container(border=True):
         st.markdown(
-            """
+            dedent("""
             <div class="section-title">
                 <span class="section-number">◉</span>
                 Ringkasan Hari Ini
