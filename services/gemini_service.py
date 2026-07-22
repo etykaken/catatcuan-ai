@@ -108,7 +108,31 @@ def _extract_text_or_raise(response, context: str) -> str:
 def analyze_transactions(api_key: str, user_input: str) -> dict:
     client = genai.Client(api_key=api_key)
 
-    response = client.models.generate_content(
+    import time
+
+for i in range(3):
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=user_input,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION,
+                response_mime_type="application/json",
+                response_schema=RESPONSE_SCHEMA,
+                thinking_config=types.ThinkingConfig(
+                    thinking_level="low",
+                ),
+                max_output_tokens=2048,
+                temperature=0.1,
+            ),
+        )
+        break
+
+    except Exception as e:
+        if "503" in str(e) and i < 2:
+            time.sleep(2)
+            continue
+        raise
         model=MODEL_NAME,
         contents=user_input,
         config=types.GenerateContentConfig(
