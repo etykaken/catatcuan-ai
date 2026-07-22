@@ -1136,7 +1136,7 @@ if analyze_button:
 
     else:
         try:
-            api_key = st.secrets["GEMINI_API_KEY"]
+            api_key = st.secrets["GROQ_API_KEY"]
         except (FileNotFoundError, KeyError):
             st.error("GEMINI_API_KEY belum dipasang di Streamlit Secrets.")
         else:
