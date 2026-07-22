@@ -1,5 +1,4 @@
 import re
-import threading
 import time
 from datetime import date, timedelta
 from io import BytesIO
@@ -15,36 +14,11 @@ MAX_AMOUNT = 10_000_000_000
 MAX_TRANSACTIONS_PER_REQUEST = 50
 MAX_TOTAL_TRANSACTIONS = 5000
 RATE_LIMIT_SECONDS = 3
-GLOBAL_MAX_REQUESTS = 20
-GLOBAL_WINDOW_SECONDS = 60
 ISO_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 FORMULA_TRIGGER_CHARS = ("=", "+", "-", "@", "\t", "\r")
-SECRET_LIKE_PATTERN = re.compile(
-    r"(sk-[A-Za-z0-9\-_]{10,}|AIza[A-Za-z0-9\-_]{20,}|ya29\.[A-Za-z0-9\-_]{20,}|Bearer\s+[A-Za-z0-9\-_.]{10,})",
-    re.IGNORECASE,
-)
+SECRET_LIKE_PATTERN = re.compile(r"(sk-[A-Za-z0-9\-_]{10,}|AIza[A-Za-z0-9\-_]{20,})")
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 FAVICON_PATH = ASSETS_DIR / "favicon.png"
-
-# Process-wide (bukan per-session) rate limiter. Ini lapisan pertahanan tambahan
-# karena st.session_state hanya membatasi satu sesi/tab -- pengguna yang sama
-# bisa membuka banyak tab/sesi untuk melewati RATE_LIMIT_SECONDS. Limiter ini
-# dibagi ke semua sesi dalam satu proses server sehingga membatasi total beban
-# ke API Gemini. Catatan: ini best-effort (reset jika proses restart / scaling
-# multi-proses), bukan pengganti rate limiting di sisi gateway/reverse proxy.
-_global_rate_lock = threading.Lock()
-_global_request_log: list[float] = []
-
-
-def check_global_rate_limit() -> bool:
-    now = time.time()
-    with _global_rate_lock:
-        while _global_request_log and now - _global_request_log[0] > GLOBAL_WINDOW_SECONDS:
-            _global_request_log.pop(0)
-        if len(_global_request_log) >= GLOBAL_MAX_REQUESTS:
-            return False
-        _global_request_log.append(now)
-        return True
 
 try:
     DEBUG_MODE = bool(st.secrets.get("DEBUG_MODE", False))
@@ -83,47 +57,9 @@ def coerce_amount(raw_amount) -> int | None:
     if isinstance(raw_amount, float):
         return int(raw_amount) if raw_amount.is_integer() else None
     if isinstance(raw_amount, str):
-        cleaned = raw_amount.strip()
-        if not cleaned or not re.fullmatch(r"[0-9.,]+", cleaned):
-            return None
-        # BUG LAMA: replace(".", "").replace(",", "") melucuti titik & koma
-        # sekaligus tanpa peduli mana pemisah ribuan dan mana pemisah desimal,
-        # sehingga "300.000,50" (tiga ratus ribu koma lima puluh) akan salah
-        # terbaca menjadi 30000050 (naik ~100x). Nominal di aplikasi ini
-        # seharusnya bilangan bulat Rupiah (tanpa sen), jadi kita perlakukan
-        # simbol terakhir sebagai pemisah desimal HANYA jika diikuti tepat
-        # 1-2 digit di akhir string; jika bagian desimalnya bukan nol, kita
-        # tolak nilainya (lebih aman gagal daripada diam-diam salah catat).
-        last_dot, last_comma = cleaned.rfind("."), cleaned.rfind(",")
-        decimal_pos = max(last_dot, last_comma)
-        looks_decimal = decimal_pos != -1 and len(cleaned) - decimal_pos - 1 in (1, 2)
-        if looks_decimal:
-            integer_part = re.sub(r"[.,]", "", cleaned[:decimal_pos])
-            decimal_part = cleaned[decimal_pos + 1:]
-            if not integer_part.isdigit() or not decimal_part.isdigit():
-                return None
-            if int(decimal_part) != 0:
-                return None
-            digits = integer_part
-        else:
-            digits = re.sub(r"[.,]", "", cleaned)
-        return int(digits) if digits.isdigit() else None
+        cleaned = raw_amount.strip().replace(".", "").replace(",", "")
+        return int(cleaned) if cleaned.isdigit() else None
     return None
-
-
-def coerce_bool(value) -> bool:
-    # BUG LAMA: `"Ya" if item.get("requires_confirmation", False) else "Tidak"`
-    # memakai truthiness Python langsung. Jika Gemini mengembalikan string
-    # seperti "false" (bukan boolean asli), Python menganggapnya truthy
-    # (string non-kosong) sehingga salah tercatat sebagai "Ya". Fungsi ini
-    # menormalkan nilai dari luar (LLM/JSON) menjadi boolean yang benar.
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return value == 1
-    if isinstance(value, str):
-        return value.strip().lower() in {"true", "1", "yes", "ya"}
-    return False
 
 
 def sanitize_text_field(value, max_length: int) -> str:
@@ -152,7 +88,7 @@ def validate_transactions(raw_transactions: list) -> list:
             "Kategori": sanitize_excel_cell(sanitize_text_field(item.get("category", ""), 60)),
             "Keterangan": sanitize_excel_cell(sanitize_text_field(item.get("description", ""), 120)),
             "Nominal": amount,
-            "Perlu Konfirmasi": "Ya" if coerce_bool(item.get("requires_confirmation", False)) else "Tidak",
+            "Perlu Konfirmasi": "Ya" if item.get("requires_confirmation", False) else "Tidak",
         })
     return validated
 
@@ -261,8 +197,6 @@ if analyze_button:
         st.warning("Mohon tunggu beberapa detik sebelum mengirim permintaan berikutnya.")
     elif not user_input.strip():
         st.warning("Tulis transaksi terlebih dahulu.")
-    elif not check_global_rate_limit():
-        st.warning("Sistem sedang menerima banyak permintaan. Silakan coba lagi sesaat lagi.")
     else:
         try:
             api_key = st.secrets["GEMINI_API_KEY"]
