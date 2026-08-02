@@ -18,6 +18,7 @@ from config import (
     RATE_LIMIT_SECONDS,
 )
 from services.ai_service import (
+    AIServiceError,
     analyze_transactions,
     ask_financial_assistant,
 )
@@ -25,9 +26,6 @@ from utils.security import redact_secret_like_strings
 from utils.transactions import validate_transactions
 
 
-# =========================================================
-# PAGE CONFIG
-# =========================================================
 st.set_page_config(
     page_title="CatatCuan AI",
     page_icon=str(FAVICON_PATH) if FAVICON_PATH.exists() else "🤖",
@@ -35,419 +33,222 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+css_path = Path(__file__).resolve().parent / "styles" / "main.css"
+st.markdown(
+    f"<style>{css_path.read_text(encoding='utf-8')}</style>",
+    unsafe_allow_html=True,
+)
 
-# =========================================================
-# LOAD CSS
-# =========================================================
-def load_css() -> None:
-    css_path = Path(__file__).resolve().parent / "styles" / "main.css"
+try:
+    DEBUG_MODE = bool(st.secrets.get("DEBUG_MODE", False))
+except (FileNotFoundError, KeyError):
+    DEBUG_MODE = False
 
-    if not css_path.exists():
-        st.error("File styles/main.css tidak ditemukan.")
-        st.stop()
+if "transactions" not in st.session_state:
+    st.session_state.transactions = []
 
-    st.markdown(
-        f"<style>{css_path.read_text(encoding='utf-8')}</style>",
-        unsafe_allow_html=True,
-    )
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
+if "last_request_time" not in st.session_state:
+    st.session_state.last_request_time = 0.0
 
-# =========================================================
-# SESSION STATE
-# =========================================================
-def initialize_session_state() -> None:
-    defaults = {
-        "transactions": [],
-        "chat_history": [],
-        "last_request_time": 0.0,
-        "last_chat_request_time": 0.0,
-    }
-
-    for key, default_value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = default_value
-
-
-# =========================================================
-# SETTINGS
-# =========================================================
-def get_debug_mode() -> bool:
-    try:
-        return bool(st.secrets.get("DEBUG_MODE", False))
-    except (FileNotFoundError, KeyError):
-        return False
+if "last_chat_request_time" not in st.session_state:
+    st.session_state.last_chat_request_time = 0.0
 
 
 def get_api_key() -> str | None:
     try:
         return st.secrets["GROQ_API_KEY"]
     except (FileNotFoundError, KeyError):
-        st.error(
-            "GROQ_API_KEY belum dipasang di Streamlit Secrets."
-        )
+        st.error("GROQ_API_KEY belum dipasang di Streamlit Secrets.")
         return None
 
 
-# =========================================================
-# DATA HELPERS
-# =========================================================
-def get_dataframe() -> pd.DataFrame:
-    columns = [
-        "Tanggal",
-        "Deskripsi",
-        "Kategori",
-        "Tipe",
-        "Jumlah",
-        "Perlu Konfirmasi",
-    ]
+render_header()
 
-    if not st.session_state.transactions:
-        return pd.DataFrame(columns=columns)
-
+if st.session_state.transactions:
     dataframe = pd.DataFrame(st.session_state.transactions)
-
-    for column in columns:
-        if column not in dataframe.columns:
-            dataframe[column] = None
-
-    return dataframe[columns]
-
-
-def calculate_summary(
-    dataframe: pd.DataFrame,
-) -> tuple[int, int, int, float]:
-    if dataframe.empty:
-        return 0, 0, 0, 0.0
-
-    total_income = int(
-        dataframe.loc[
-            dataframe["Tipe"] == "Pemasukan",
+else:
+    dataframe = pd.DataFrame(
+        columns=[
+            "Tanggal",
+            "Deskripsi",
+            "Kategori",
+            "Tipe",
             "Jumlah",
-        ].sum()
+            "Perlu Konfirmasi",
+        ]
     )
 
-    total_expense = int(
-        dataframe.loc[
-            dataframe["Tipe"] == "Pengeluaran",
-            "Jumlah",
-        ].sum()
-    )
+total_income = (
+    int(dataframe.loc[dataframe["Tipe"] == "Pemasukan", "Jumlah"].sum())
+    if not dataframe.empty
+    else 0
+)
+total_expense = (
+    int(dataframe.loc[dataframe["Tipe"] == "Pengeluaran", "Jumlah"].sum())
+    if not dataframe.empty
+    else 0
+)
+net_result = total_income - total_expense
+expense_ratio = (
+    total_expense / total_income * 100
+    if total_income > 0
+    else 0.0
+)
 
-    net_result = total_income - total_expense
+left_column, right_column = st.columns([1, 1], gap="medium")
 
-    expense_ratio = (
-        total_expense / total_income * 100
-        if total_income > 0
-        else 0.0
-    )
+with left_column:
+    transaction_text, analyze_button = render_transaction_input()
 
-    return (
+with right_column:
+    render_summary(
         total_income,
         total_expense,
         net_result,
-        expense_ratio,
     )
 
-
-# =========================================================
-# TRANSACTION ACTION
-# =========================================================
-def handle_transaction_submission(
-    transaction_text: str,
-    analyze_button: bool,
-    debug_mode: bool,
-) -> None:
-    if not analyze_button:
-        return
-
+if analyze_button:
     now = time.time()
 
-    if (
-        now - st.session_state.last_request_time
-        < RATE_LIMIT_SECONDS
-    ):
-        st.warning(
-            "Tunggu beberapa detik sebelum mengirim transaksi lagi."
-        )
-        return
-
-    if not transaction_text.strip():
+    if now - st.session_state.last_request_time < RATE_LIMIT_SECONDS:
+        st.warning("Tunggu beberapa detik sebelum mengirim lagi.")
+    elif not transaction_text.strip():
         st.warning("Tulis transaksi terlebih dahulu.")
-        return
+    else:
+        api_key = get_api_key()
 
-    api_key = get_api_key()
-    if not api_key:
-        return
+        if api_key:
+            try:
+                st.session_state.last_request_time = now
 
-    try:
-        st.session_state.last_request_time = now
-
-        with st.spinner(
-            "CatatCuan AI sedang membaca transaksi..."
-        ):
-            result = analyze_transactions(
-                api_key=api_key,
-                user_input=transaction_text.strip()[
-                    :MAX_INPUT_LENGTH
-                ],
-            )
-
-        raw_transactions = (
-            result.get("transactions", [])
-            if isinstance(result, dict)
-            else []
-        )
-
-        new_transactions = validate_transactions(
-            raw_transactions
-        )
-
-        if not new_transactions:
-            st.warning(
-                "Tidak ditemukan transaksi yang bisa dicatat."
-            )
-            return
-
-        remaining_slots = (
-            MAX_TOTAL_TRANSACTIONS
-            - len(st.session_state.transactions)
-        )
-
-        if remaining_slots <= 0:
-            st.warning(
-                "Riwayat transaksi sudah mencapai batas maksimum."
-            )
-            return
-
-        added_transactions = new_transactions[:remaining_slots]
-
-        st.session_state.transactions.extend(
-            added_transactions
-        )
-
-        st.success(
-            f"{len(added_transactions)} transaksi "
-            "berhasil ditambahkan."
-        )
-        st.rerun()
-
-    except Exception as error:
-        st.error(
-            "Transaksi gagal diproses. Silakan coba lagi."
-        )
-
-        if debug_mode:
-            with st.expander("Detail error"):
-                st.code(
-                    redact_secret_like_strings(
-                        str(error),
-                        api_key,
+                with st.spinner("CatatCuan AI sedang membaca transaksi..."):
+                    result = analyze_transactions(
+                        api_key=api_key,
+                        user_input=transaction_text.strip()[:MAX_INPUT_LENGTH],
                     )
+
+                new_transactions = validate_transactions(
+                    result.get("transactions", [])
+                    if isinstance(result, dict)
+                    else []
                 )
 
+                if not new_transactions:
+                    st.warning("Tidak ditemukan transaksi yang bisa dicatat.")
+                else:
+                    remaining = (
+                        MAX_TOTAL_TRANSACTIONS
+                        - len(st.session_state.transactions)
+                    )
 
-# =========================================================
-# CHAT ACTION
-# =========================================================
-def handle_chat_submission(
-    question: str,
-    ask_button: bool,
-    clear_chat_button: bool,
-    dataframe: pd.DataFrame,
-    debug_mode: bool,
-) -> None:
-    if clear_chat_button:
-        st.session_state.chat_history = []
-        st.rerun()
+                    if remaining <= 0:
+                        st.warning("Riwayat transaksi sudah mencapai batas.")
+                    else:
+                        added = new_transactions[:remaining]
+                        st.session_state.transactions.extend(added)
+                        st.success(
+                            f"{len(added)} transaksi berhasil ditambahkan."
+                        )
+                        st.rerun()
 
-    if not ask_button:
-        return
+            except Exception as error:
+                st.error("Transaksi gagal diproses. Silakan coba lagi.")
 
+                if DEBUG_MODE:
+                    with st.expander("Detail error"):
+                        st.code(
+                            redact_secret_like_strings(
+                                str(error),
+                                api_key,
+                            )
+                        )
+
+render_insight_and_chart(
+    dataframe,
+    total_income,
+    total_expense,
+    net_result,
+    expense_ratio,
+)
+
+question, ask_button, clear_chat_button = render_chat()
+
+if clear_chat_button:
+    st.session_state.chat_history = []
+    st.rerun()
+
+if ask_button:
     now = time.time()
 
     if dataframe.empty:
-        st.warning(
-            "Tambahkan transaksi sebelum bertanya kepada AI."
-        )
-        return
-
-    if not question.strip():
+        st.warning("Tambahkan transaksi sebelum bertanya kepada AI.")
+    elif not question.strip():
         st.warning("Tulis pertanyaan terlebih dahulu.")
-        return
-
-    if (
+    elif (
         now - st.session_state.last_chat_request_time
         < RATE_LIMIT_SECONDS
     ):
-        st.warning(
-            "Tunggu beberapa detik sebelum bertanya lagi."
-        )
-        return
+        st.warning("Tunggu beberapa detik sebelum bertanya lagi.")
+    else:
+        api_key = get_api_key()
 
-    api_key = get_api_key()
-    if not api_key:
-        return
+        if api_key:
+            try:
+                st.session_state.last_chat_request_time = now
 
-    try:
-        st.session_state.last_chat_request_time = now
-
-        with st.spinner(
-            "CatatCuan AI sedang menganalisis..."
-        ):
-            answer = ask_financial_assistant(
-                api_key=api_key,
-                question=question.strip(),
-                transactions=st.session_state.transactions,
-            )
-
-        st.session_state.chat_history.extend(
-            [
-                {
-                    "role": "user",
-                    "message": question.strip(),
-                },
-                {
-                    "role": "assistant",
-                    "message": answer,
-                },
-            ]
-        )
-
-        st.rerun()
-
-    except Exception as error:
-        st.error(
-            "CatatCuan AI gagal menjawab. Silakan coba lagi."
-        )
-
-        if debug_mode:
-            with st.expander("Detail error"):
-                st.code(
-                    redact_secret_like_strings(
-                        str(error),
-                        api_key,
+                with st.spinner("CatatCuan AI sedang menganalisis..."):
+                    answer = ask_financial_assistant(
+                        api_key=api_key,
+                        question=question.strip(),
+                        transactions=st.session_state.transactions,
                     )
+
+                st.session_state.chat_history.extend(
+                    [
+                        {"role": "user", "message": question.strip()},
+                        {"role": "assistant", "message": answer},
+                    ]
                 )
+                st.rerun()
 
+            except Exception as error:
+                st.error("CatatCuan AI gagal menjawab.")
 
-# =========================================================
-# RESET
-# =========================================================
-def render_reset_button() -> None:
-    reset_column, _ = st.columns([1, 4])
+                if DEBUG_MODE:
+                    with st.expander("Detail error"):
+                        st.code(
+                            redact_secret_like_strings(
+                                str(error),
+                                api_key,
+                            )
+                        )
 
-    with reset_column:
-        reset_button = st.button(
-            "Hapus semua data",
-            use_container_width=True,
-        )
+render_history(dataframe)
 
-    if reset_button:
+render_export(
+    dataframe,
+    total_income,
+    total_expense,
+    net_result,
+    expense_ratio,
+)
+
+reset_column, _ = st.columns([1, 4])
+
+with reset_column:
+    if st.button("Hapus semua data", use_container_width=True):
         st.session_state.transactions = []
         st.session_state.chat_history = []
-        st.session_state.last_request_time = 0.0
-        st.session_state.last_chat_request_time = 0.0
         st.rerun()
 
-
-# =========================================================
-# MAIN — SINGLE PAGE
-# =========================================================
-def main() -> None:
-    load_css()
-    initialize_session_state()
-
-    debug_mode = get_debug_mode()
-
-    # Semua bagian tampil dalam SATU halaman.
-    render_header()
-
-    dataframe = get_dataframe()
-
-    (
-        total_income,
-        total_expense,
-        net_result,
-        expense_ratio,
-    ) = calculate_summary(dataframe)
-
-    input_column, summary_column = st.columns(
-        [1, 1],
-        gap="medium",
-    )
-
-    with input_column:
-        (
-            transaction_text,
-            analyze_button,
-        ) = render_transaction_input()
-
-    with summary_column:
-        render_summary(
-            total_income,
-            total_expense,
-            net_result,
-        )
-
-    handle_transaction_submission(
-        transaction_text=transaction_text,
-        analyze_button=analyze_button,
-        debug_mode=debug_mode,
-    )
-
-    # Refresh data after possible rerun.
-    dataframe = get_dataframe()
-
-    (
-        total_income,
-        total_expense,
-        net_result,
-        expense_ratio,
-    ) = calculate_summary(dataframe)
-
-    render_insight_and_chart(
-        dataframe=dataframe,
-        total_income=total_income,
-        total_expense=total_expense,
-        net_result=net_result,
-        expense_ratio=expense_ratio,
-    )
-
-    (
-        question,
-        ask_button,
-        clear_chat_button,
-    ) = render_chat()
-
-    handle_chat_submission(
-        question=question,
-        ask_button=ask_button,
-        clear_chat_button=clear_chat_button,
-        dataframe=dataframe,
-        debug_mode=debug_mode,
-    )
-
-    render_history(dataframe)
-
-    render_export(
-        dataframe=dataframe,
-        total_income=total_income,
-        total_expense=total_expense,
-        net_result=net_result,
-        expense_ratio=expense_ratio,
-    )
-
-    render_reset_button()
-
-    st.markdown(
-        """
-        <div class="footer-copy">
-            CatatCuan AI • Powered by Groq AI • Made with ❤️
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-if __name__ == "__main__":
-    main()
+st.markdown(
+    """
+    <div class="footer-copy">
+        CatatCuan AI • Powered by Groq AI • Made with ❤️
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
