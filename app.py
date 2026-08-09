@@ -77,6 +77,19 @@ def get_api_key() -> str | None:
 
 
 render_header()
+if st.session_state.auth_mode:
+    mode, email, password, submitted = render_auth()
+
+    if st.button(
+        "← Kembali ke dashboard",
+        use_container_width=False,
+        key="back_to_dashboard",
+    ):
+        st.session_state.auth_mode = False
+        st.rerun()
+
+    st.stop()
+
 
 try:
     if test_connection():
