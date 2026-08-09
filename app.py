@@ -147,15 +147,12 @@ if analyze_button:
                         MAX_TOTAL_TRANSACTIONS
                         - len(st.session_state.transactions)
                     )
-
+                        
                     if remaining <= 0:
                         st.warning("Riwayat transaksi sudah mencapai batas.")
                     else:
-                        added = new_transactions[:remaining]
-                        st.session_state.transactions.extend(added)
-                        st.success(
-                            f"{len(added)} transaksi berhasil ditambahkan."
-                        )
+                        pending = new_transactions[:remaining]
+                        st.session_state.pending_transactions = pending
                         st.rerun()
 
             except Exception as error:
