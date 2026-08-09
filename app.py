@@ -13,7 +13,6 @@ from components.insight_chart import render_insight_and_chart
 from components.summary import render_summary
 from components.transaction_input import render_transaction_input
 from components.transaction_preview import render_transaction_preview
-from utils.i18n import t
 
 from config import (
     FAVICON_PATH,
@@ -85,6 +84,7 @@ try:
             False,
         )
     )
+
 except (FileNotFoundError, KeyError):
     DEBUG_MODE = False
 
@@ -92,6 +92,9 @@ except (FileNotFoundError, KeyError):
 # =========================================================
 # SESSION STATE
 # =========================================================
+
+if "language" not in st.session_state:
+    st.session_state.language = "id"
 
 if "auth_mode" not in st.session_state:
     st.session_state.auth_mode = False
@@ -113,10 +116,7 @@ if "last_request_time" not in st.session_state:
 
 if "last_chat_request_time" not in st.session_state:
     st.session_state.last_chat_request_time = 0.0
-    
-if "language" not in st.session_state:
-    st.session_state.language = "id"
-    
+
 
 # =========================================================
 # GROQ API KEY
@@ -128,7 +128,7 @@ def get_api_key() -> str | None:
 
     except (FileNotFoundError, KeyError):
         st.error(
-            "GROQ_API_KEY belum dipasang "
+            "GROQ_API_KEY belum tersedia "
             "di Streamlit Secrets."
         )
 
@@ -140,70 +140,125 @@ def get_api_key() -> str | None:
 # =========================================================
 
 if st.session_state.auth_mode:
+
     mode, email, password, submitted = render_auth()
 
     if submitted:
+
         try:
 
-            # =================================================
+            # =============================================
             # SIGN UP
-            # =================================================
+            # =============================================
 
             if mode == "signup":
+
                 response = sign_up(
                     email=email,
                     password=password,
                 )
 
                 if response.session:
-                    st.session_state.user = response.user
+
+                    st.session_state.user = (
+                        response.user
+                    )
+
                     st.session_state.auth_mode = False
 
-                    st.success(
-                        "Akun berhasil dibuat. "
-                        "Selamat datang di CatatCuan."
-                    )
+                    if (
+                        st.session_state.language
+                        == "id"
+                    ):
+                        st.success(
+                            "Akun berhasil dibuat. "
+                            "Selamat datang di CatatCuan."
+                        )
+
+                    else:
+                        st.success(
+                            "Your account has been created. "
+                            "Welcome to CatatCuan."
+                        )
 
                     st.rerun()
 
                 else:
-                    st.success(
-                        "Akun berhasil dibuat. "
-                        "Silakan cek email untuk "
-                        "mengonfirmasi akunmu."
-                    )
 
-            # =================================================
+                    if (
+                        st.session_state.language
+                        == "id"
+                    ):
+                        st.success(
+                            "Akun berhasil dibuat. "
+                            "Silakan cek email untuk "
+                            "mengonfirmasi akunmu."
+                        )
+
+                    else:
+                        st.success(
+                            "Your account has been created. "
+                            "Please check your email "
+                            "to confirm your account."
+                        )
+
+            # =============================================
             # LOGIN
-            # =================================================
+            # =============================================
 
             elif mode == "login":
+
                 response = sign_in(
                     email=email,
                     password=password,
                 )
 
-                st.session_state.user = response.user
+                st.session_state.user = (
+                    response.user
+                )
+
                 st.session_state.auth_mode = False
 
-                st.success(
-                    "Berhasil masuk ke CatatCuan."
-                )
+                if (
+                    st.session_state.language
+                    == "id"
+                ):
+                    st.success(
+                        "Berhasil masuk ke CatatCuan."
+                    )
+
+                else:
+                    st.success(
+                        "Welcome back to CatatCuan."
+                    )
 
                 st.rerun()
 
         except SupabaseServiceError as error:
+
             st.error(
                 str(error)
             )
 
         except Exception as error:
-            st.error(
-                "CatatCuan belum berhasil "
-                "memproses akunmu."
-            )
+
+            if (
+                st.session_state.language
+                == "id"
+            ):
+                st.error(
+                    "CatatCuan belum berhasil "
+                    "memproses akunmu."
+                )
+
+            else:
+                st.error(
+                    "CatatCuan couldn't process "
+                    "your account right now."
+                )
 
             if DEBUG_MODE:
+
                 with st.expander(
                     "Detail error"
                 ):
@@ -213,85 +268,27 @@ if st.session_state.auth_mode:
 
     st.write("")
 
+    back_label = (
+        "← Kembali ke CatatCuan"
+        if st.session_state.language == "id"
+        else "← Back to CatatCuan"
+    )
+
     if st.button(
-        "← Kembali ke CatatCuan",
+        back_label,
         key="back_to_home",
     ):
         st.session_state.auth_mode = False
         st.rerun()
 
-    # Hentikan render dashboard hanya ketika
-    # user memang sedang berada di halaman auth.
+    # Hanya stop dashboard
+    # ketika user memang membuka halaman auth.
     st.stop()
-
-
-# =========================================================
-# AUTH ENTRY BUTTON
-# =========================================================
-
-auth_column, spacer_column = st.columns(
-    [1.25, 5]
-)
-
-with auth_column:
-
-    if st.session_state.user is None:
-        if st.button(
-            "Masuk / Buat akun",
-            key="open_auth",
-            use_container_width=True,
-        ):
-            st.session_state.auth_mode = True
-            st.rerun()
-
-    else:
-        user_email = getattr(
-            st.session_state.user,
-            "email",
-            None,
-        )
-
-        if user_email:
-            st.caption(
-                f"Masuk sebagai {user_email}"
-            )
 
 
 # =========================================================
 # HEADER
 # =========================================================
-
-language_column, _ = st.columns(
-    [1, 5]
-)
-
-with language_column:
-    language_choice = st.selectbox(
-        "Language",
-        options=["ID", "EN"],
-        index=(
-            0
-            if st.session_state.language == "id"
-            else 1
-        ),
-        key="language_selector",
-        label_visibility="collapsed",
-    )
-
-    selected_language = (
-        "id"
-        if language_choice == "ID"
-        else "en"
-    )
-
-    if (
-        selected_language
-        != st.session_state.language
-    ):
-        st.session_state.language = (
-            selected_language
-        )
-        st.rerun()
 
 render_header()
 
@@ -301,11 +298,13 @@ render_header()
 # =========================================================
 
 if st.session_state.transactions:
+
     dataframe = pd.DataFrame(
         st.session_state.transactions
     )
 
 else:
+
     dataframe = pd.DataFrame(
         columns=[
             "Tanggal",
@@ -325,7 +324,8 @@ else:
 total_income = (
     int(
         dataframe.loc[
-            dataframe["Tipe"] == "Pemasukan",
+            dataframe["Tipe"]
+            == "Pemasukan",
             "Jumlah",
         ].sum()
     )
@@ -336,7 +336,8 @@ total_income = (
 total_expense = (
     int(
         dataframe.loc[
-            dataframe["Tipe"] == "Pengeluaran",
+            dataframe["Tipe"]
+            == "Pengeluaran",
             "Jumlah",
         ].sum()
     )
@@ -368,12 +369,15 @@ left_column, right_column = st.columns(
 )
 
 with left_column:
+
     (
         transaction_text,
         analyze_button,
     ) = render_transaction_input()
 
+
 with right_column:
+
     render_summary(
         total_income,
         total_expense,
@@ -386,6 +390,7 @@ with right_column:
 # =========================================================
 
 if analyze_button:
+
     now = time.time()
 
     if (
@@ -393,29 +398,62 @@ if analyze_button:
         - st.session_state.last_request_time
         < RATE_LIMIT_SECONDS
     ):
-        st.warning(
-            "Tunggu beberapa detik "
-            "sebelum mengirim lagi."
-        )
+
+        if (
+            st.session_state.language
+            == "id"
+        ):
+            st.warning(
+                "Tunggu beberapa detik "
+                "sebelum mengirim lagi."
+            )
+
+        else:
+            st.warning(
+                "Please wait a few seconds "
+                "before submitting again."
+            )
 
     elif not transaction_text.strip():
-        st.warning(
-            "Tulis transaksi terlebih dahulu."
-        )
+
+        if (
+            st.session_state.language
+            == "id"
+        ):
+            st.warning(
+                "Tulis transaksi terlebih dahulu."
+            )
+
+        else:
+            st.warning(
+                "Please enter a transaction first."
+            )
 
     else:
+
         api_key = get_api_key()
 
         if api_key:
+
             try:
+
                 st.session_state.last_request_time = (
                     now
                 )
 
-                with st.spinner(
+                spinner_text = (
                     "CatatCuan sedang "
                     "memahami ceritamu..."
+                    if st.session_state.language == "id"
+                    else
+                    "CatatCuan is understanding "
+                    "your story..."
+                )
+
+                with st.spinner(
+                    spinner_text
                 ):
+
                     result = analyze_transactions(
                         api_key=api_key,
                         user_input=(
@@ -441,12 +479,24 @@ if analyze_button:
                 )
 
                 if not new_transactions:
-                    st.warning(
-                        "CatatCuan belum menemukan "
-                        "transaksi yang bisa dicatat."
-                    )
+
+                    if (
+                        st.session_state.language
+                        == "id"
+                    ):
+                        st.warning(
+                            "CatatCuan belum menemukan "
+                            "transaksi yang bisa dicatat."
+                        )
+
+                    else:
+                        st.warning(
+                            "CatatCuan couldn't find "
+                            "a transaction to record."
+                        )
 
                 else:
+
                     remaining = (
                         MAX_TOTAL_TRANSACTIONS
                         - len(
@@ -455,12 +505,24 @@ if analyze_button:
                     )
 
                     if remaining <= 0:
-                        st.warning(
-                            "Riwayat transaksi "
-                            "sudah mencapai batas."
-                        )
+
+                        if (
+                            st.session_state.language
+                            == "id"
+                        ):
+                            st.warning(
+                                "Riwayat transaksi "
+                                "sudah mencapai batas."
+                            )
+
+                        else:
+                            st.warning(
+                                "Transaction history "
+                                "has reached the limit."
+                            )
 
                     else:
+
                         st.session_state.pending_transactions = (
                             new_transactions[
                                 :remaining
@@ -470,15 +532,28 @@ if analyze_button:
                         st.rerun()
 
             except Exception as error:
-                st.error(
-                    "Transaksi gagal diproses. "
-                    "Silakan coba lagi."
-                )
+
+                if (
+                    st.session_state.language
+                    == "id"
+                ):
+                    st.error(
+                        "Transaksi gagal diproses. "
+                        "Silakan coba lagi."
+                    )
+
+                else:
+                    st.error(
+                        "The transaction couldn't "
+                        "be processed. Please try again."
+                    )
 
                 if DEBUG_MODE:
+
                     with st.expander(
                         "Detail error"
                     ):
+
                         st.code(
                             redact_secret_like_strings(
                                 str(error),
@@ -492,6 +567,7 @@ if analyze_button:
 # =========================================================
 
 if st.session_state.pending_transactions:
+
     (
         edited_transactions,
         save_button,
@@ -501,10 +577,13 @@ if st.session_state.pending_transactions:
     )
 
     if cancel_button:
+
         st.session_state.pending_transactions = []
+
         st.rerun()
 
     if save_button:
+
         transactions_to_save = (
             edited_transactions
         )
@@ -515,10 +594,22 @@ if st.session_state.pending_transactions:
 
         st.session_state.pending_transactions = []
 
-        st.success(
-            f"{len(transactions_to_save)} "
-            "transaksi berhasil disimpan."
-        )
+        if (
+            st.session_state.language
+            == "id"
+        ):
+
+            st.success(
+                f"{len(transactions_to_save)} "
+                "transaksi berhasil disimpan."
+            )
+
+        else:
+
+            st.success(
+                f"{len(transactions_to_save)} "
+                "transactions saved successfully."
+            )
 
         st.rerun()
 
@@ -537,7 +628,7 @@ render_insight_and_chart(
 
 
 # =========================================================
-# CATATCUAN AI CHAT
+# CHAT
 # =========================================================
 
 (
@@ -548,47 +639,94 @@ render_insight_and_chart(
 
 
 if clear_chat_button:
+
     st.session_state.chat_history = []
+
     st.rerun()
 
 
 if ask_button:
+
     now = time.time()
 
     if dataframe.empty:
-        st.warning(
-            "Tambahkan transaksi sebelum "
-            "bertanya kepada CatatCuan."
-        )
+
+        if (
+            st.session_state.language
+            == "id"
+        ):
+            st.warning(
+                "Tambahkan transaksi sebelum "
+                "bertanya kepada CatatCuan."
+            )
+
+        else:
+            st.warning(
+                "Add a transaction before "
+                "asking CatatCuan."
+            )
 
     elif not question.strip():
-        st.warning(
-            "Tulis pertanyaan terlebih dahulu."
-        )
+
+        if (
+            st.session_state.language
+            == "id"
+        ):
+            st.warning(
+                "Tulis pertanyaan terlebih dahulu."
+            )
+
+        else:
+            st.warning(
+                "Please enter a question first."
+            )
 
     elif (
         now
         - st.session_state.last_chat_request_time
         < RATE_LIMIT_SECONDS
     ):
-        st.warning(
-            "Tunggu beberapa detik "
-            "sebelum bertanya lagi."
-        )
+
+        if (
+            st.session_state.language
+            == "id"
+        ):
+            st.warning(
+                "Tunggu beberapa detik "
+                "sebelum bertanya lagi."
+            )
+
+        else:
+            st.warning(
+                "Please wait a few seconds "
+                "before asking again."
+            )
 
     else:
+
         api_key = get_api_key()
 
         if api_key:
+
             try:
+
                 st.session_state.last_chat_request_time = (
                     now
                 )
 
-                with st.spinner(
+                spinner_text = (
                     "CatatCuan sedang "
                     "menganalisis keuanganmu..."
+                    if st.session_state.language == "id"
+                    else
+                    "CatatCuan is analyzing "
+                    "your finances..."
+                )
+
+                with st.spinner(
+                    spinner_text
                 ):
+
                     answer = ask_financial_assistant(
                         api_key=api_key,
                         question=question.strip(),
@@ -601,7 +739,9 @@ if ask_button:
                     [
                         {
                             "role": "user",
-                            "message": question.strip(),
+                            "message": (
+                                question.strip()
+                            ),
                         },
                         {
                             "role": "assistant",
@@ -613,15 +753,28 @@ if ask_button:
                 st.rerun()
 
             except Exception as error:
-                st.error(
-                    "CatatCuan belum berhasil "
-                    "menjawab pertanyaan."
-                )
+
+                if (
+                    st.session_state.language
+                    == "id"
+                ):
+                    st.error(
+                        "CatatCuan belum berhasil "
+                        "menjawab pertanyaan."
+                    )
+
+                else:
+                    st.error(
+                        "CatatCuan couldn't answer "
+                        "your question."
+                    )
 
                 if DEBUG_MODE:
+
                     with st.expander(
                         "Detail error"
                     ):
+
                         st.code(
                             redact_secret_like_strings(
                                 str(error),
@@ -631,7 +784,7 @@ if ask_button:
 
 
 # =========================================================
-# TRANSACTION HISTORY
+# HISTORY
 # =========================================================
 
 render_history(
@@ -661,11 +814,19 @@ reset_column, _ = st.columns(
 )
 
 with reset_column:
+
+    reset_label = (
+        "Hapus semua data"
+        if st.session_state.language == "id"
+        else "Delete all data"
+    )
+
     if st.button(
-        "Hapus semua data",
+        reset_label,
         use_container_width=True,
         key="reset_all_data",
     ):
+
         st.session_state.transactions = []
         st.session_state.pending_transactions = []
         st.session_state.chat_history = []
@@ -677,10 +838,20 @@ with reset_column:
 # FOOTER
 # =========================================================
 
+footer_text = (
+    "CatatCuan AI • "
+    "Catat keuangan semudah bercerita."
+    if st.session_state.language == "id"
+    else
+    "CatatCuan AI • "
+    "Track your finances as naturally "
+    "as telling a story."
+)
+
 st.markdown(
-    """
+    f"""
 <div class="footer-copy">
-    CatatCuan AI • Catat keuangan semudah bercerita.
+    {footer_text}
 </div>
 """,
     unsafe_allow_html=True,
