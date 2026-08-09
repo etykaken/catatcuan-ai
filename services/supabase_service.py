@@ -8,8 +8,8 @@ class SupabaseServiceError(Exception):
 
 def get_supabase_client() -> Client:
     try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
+        url = st.secrets["https://fpaftvmrlmneqjysjnoi.supabase.co"]
+        key = st.secrets["sb_publishable_SOGDx0GAA6tvsr6EAfiSmg_XMRtI1Pv"]
 
         return create_client(url, key)
 
