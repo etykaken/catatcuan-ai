@@ -75,6 +75,15 @@ def get_api_key() -> str | None:
         st.error("GROQ_API_KEY belum dipasang di Streamlit Secrets.")
         return None
 
+auth_col, _ = st.columns([1, 5])
+
+with auth_col:
+    if st.button(
+        "Masuk / Buat akun",
+        key="open_auth",
+    ):
+        st.session_state.auth_mode = True
+        st.rerun()
 
 render_header()
 if st.session_state.auth_mode:
