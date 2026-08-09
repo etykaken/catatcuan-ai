@@ -3,52 +3,38 @@ import streamlit as st
 
 def render_auth() -> tuple[str, str, str, bool]:
     st.markdown(
-        """
-<div class="auth-shell">
-    <div class="auth-brand">
-        <div class="auth-kicker">CatatCuan AI</div>
-
-        <h1 class="auth-title">
-            Catat keuangan<br>
-            semudah bercerita.
-        </h1>
-
-        <p class="auth-description">
-            Masuk untuk melanjutkan pencatatan usahamu, melihat ringkasan keuangan,
-            dan mendapatkan insight yang lebih mudah dipahami.
-        </p>
-
-        <div class="auth-message">
-            Ceritakan transaksimu. Biar CatatCuan yang urus angkanya.
-        </div>
-    </div>
-</div>
-""",
+        '<div class="auth-kicker">CATATCUAN AI</div>',
         unsafe_allow_html=True,
     )
+
+    st.title("Catat keuangan semudah bercerita.")
+
+    st.write(
+        "Masuk untuk melanjutkan pencatatan usahamu, "
+        "melihat ringkasan keuangan, dan mendapatkan "
+        "insight yang lebih mudah dipahami."
+    )
+
+    st.caption(
+        "Ceritakan transaksimu. Biar CatatCuan yang urus angkanya."
+    )
+
+    st.write("")
 
     tab_login, tab_signup = st.tabs(
         ["Masuk", "Buat akun"]
     )
 
-
+    mode = ""
     email = ""
     password = ""
-    mode = ""
     submitted = False
 
     with tab_login:
-        st.markdown(
-            """
-            <div class="auth-form-title">
-                Selamat datang kembali
-            </div>
+        st.markdown("### Selamat datang kembali")
 
-            <div class="auth-form-helper">
-                Masuk untuk melanjutkan ke CatatCuan.
-            </div>
-            """,
-            unsafe_allow_html=True,
+        st.caption(
+            "Masuk untuk melanjutkan ke CatatCuan."
         )
 
         login_email = st.text_input(
@@ -72,23 +58,26 @@ def render_auth() -> tuple[str, str, str, bool]:
         )
 
         if login_button:
-            email = login_email
-            password = login_password
-            mode = "login"
-            submitted = True
+            clean_email = login_email.strip()
+
+            if not clean_email:
+                st.warning("Masukkan email terlebih dahulu.")
+
+            elif not login_password:
+                st.warning("Masukkan password terlebih dahulu.")
+
+            else:
+                mode = "login"
+                email = clean_email
+                password = login_password
+                submitted = True
 
     with tab_signup:
-        st.markdown(
-            """
-            <div class="auth-form-title">
-                Mulai pakai CatatCuan
-            </div>
+        st.markdown("### Mulai pakai CatatCuan")
 
-            <div class="auth-form-helper">
-                Buat akun untuk menyimpan transaksi usahamu.
-            </div>
-            """,
-            unsafe_allow_html=True,
+        st.caption(
+            "Buat akun untuk menyimpan transaksi "
+            "dan melanjutkan pencatatan usahamu."
         )
 
         signup_email = st.text_input(
@@ -104,6 +93,17 @@ def render_auth() -> tuple[str, str, str, bool]:
             key="signup_password",
         )
 
+        signup_password_confirm = st.text_input(
+            "Konfirmasi password",
+            type="password",
+            placeholder="Ulangi password",
+            key="signup_password_confirm",
+        )
+
+        st.caption(
+            "Gunakan minimal 8 karakter agar akun lebih aman."
+        )
+
         signup_button = st.button(
             "Buat akun →",
             type="primary",
@@ -112,9 +112,25 @@ def render_auth() -> tuple[str, str, str, bool]:
         )
 
         if signup_button:
-            email = signup_email
-            password = signup_password
-            mode = "signup"
-            submitted = True
+            clean_email = signup_email.strip()
+
+            if not clean_email:
+                st.warning("Masukkan email terlebih dahulu.")
+
+            elif len(signup_password) < 8:
+                st.warning(
+                    "Password harus terdiri dari minimal 8 karakter."
+                )
+
+            elif signup_password != signup_password_confirm:
+                st.warning(
+                    "Konfirmasi password belum sama."
+                )
+
+            else:
+                mode = "signup"
+                email = clean_email
+                password = signup_password
+                submitted = True
 
     return mode, email, password, submitted
