@@ -80,8 +80,6 @@ try:
 except Exception as error:
     st.error(str(error))
 
-if st.session_state.transactions:
-
 
 if st.session_state.transactions:
     dataframe = pd.DataFrame(st.session_state.transactions)
