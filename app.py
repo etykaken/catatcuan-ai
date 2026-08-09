@@ -47,7 +47,10 @@ except (FileNotFoundError, KeyError):
 
 if "transactions" not in st.session_state:
     st.session_state.transactions = []
-
+    
+if "pending_transactions" not in st.session_state:
+    st.session_state.pending_transactions = []
+    
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
