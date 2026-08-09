@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from components.auth import render_auth
 from components.chat import render_chat
 from components.export import render_export
 from components.header import render_header
@@ -23,6 +24,12 @@ from config import (
 from services.ai_service import (
     analyze_transactions,
     ask_financial_assistant,
+)
+
+from services.supabase_service import (
+    SupabaseServiceError,
+    sign_in,
+    sign_up,
 )
 
 from utils.security import redact_secret_like_strings
@@ -85,6 +92,12 @@ except (FileNotFoundError, KeyError):
 # SESSION STATE
 # =========================================================
 
+if "auth_mode" not in st.session_state:
+    st.session_state.auth_mode = False
+
+if "user" not in st.session_state:
+    st.session_state.user = None
+
 if "transactions" not in st.session_state:
     st.session_state.transactions = []
 
@@ -114,7 +127,130 @@ def get_api_key() -> str | None:
             "GROQ_API_KEY belum dipasang "
             "di Streamlit Secrets."
         )
+
         return None
+
+
+# =========================================================
+# AUTH PAGE
+# =========================================================
+
+if st.session_state.auth_mode:
+    mode, email, password, submitted = render_auth()
+
+    if submitted:
+        try:
+
+            # =================================================
+            # SIGN UP
+            # =================================================
+
+            if mode == "signup":
+                response = sign_up(
+                    email=email,
+                    password=password,
+                )
+
+                if response.session:
+                    st.session_state.user = response.user
+                    st.session_state.auth_mode = False
+
+                    st.success(
+                        "Akun berhasil dibuat. "
+                        "Selamat datang di CatatCuan."
+                    )
+
+                    st.rerun()
+
+                else:
+                    st.success(
+                        "Akun berhasil dibuat. "
+                        "Silakan cek email untuk "
+                        "mengonfirmasi akunmu."
+                    )
+
+            # =================================================
+            # LOGIN
+            # =================================================
+
+            elif mode == "login":
+                response = sign_in(
+                    email=email,
+                    password=password,
+                )
+
+                st.session_state.user = response.user
+                st.session_state.auth_mode = False
+
+                st.success(
+                    "Berhasil masuk ke CatatCuan."
+                )
+
+                st.rerun()
+
+        except SupabaseServiceError as error:
+            st.error(
+                str(error)
+            )
+
+        except Exception as error:
+            st.error(
+                "CatatCuan belum berhasil "
+                "memproses akunmu."
+            )
+
+            if DEBUG_MODE:
+                with st.expander(
+                    "Detail error"
+                ):
+                    st.code(
+                        str(error)
+                    )
+
+    st.write("")
+
+    if st.button(
+        "← Kembali ke CatatCuan",
+        key="back_to_home",
+    ):
+        st.session_state.auth_mode = False
+        st.rerun()
+
+    # Hentikan render dashboard hanya ketika
+    # user memang sedang berada di halaman auth.
+    st.stop()
+
+
+# =========================================================
+# AUTH ENTRY BUTTON
+# =========================================================
+
+auth_column, spacer_column = st.columns(
+    [1.25, 5]
+)
+
+with auth_column:
+
+    if st.session_state.user is None:
+        if st.button(
+            "Masuk / Buat akun",
+            key="open_auth",
+            use_container_width=True,
+        ):
+            st.session_state.auth_mode = True
+            st.rerun()
+
+    else:
+        user_email = getattr(
+            st.session_state.user,
+            "email",
+            None,
+        )
+
+        if user_email:
+            st.caption(
+                f"Masuk sebagai {user_email}"
+            )
 
 
 # =========================================================
@@ -147,7 +283,7 @@ else:
 
 
 # =========================================================
-# FINANCIAL SUMMARY
+# FINANCIAL CALCULATION
 # =========================================================
 
 total_income = (
@@ -172,10 +308,15 @@ total_expense = (
     else 0
 )
 
-net_result = total_income - total_expense
+net_result = (
+    total_income
+    - total_expense
+)
 
 expense_ratio = (
-    total_expense / total_income * 100
+    total_expense
+    / total_income
+    * 100
     if total_income > 0
     else 0.0
 )
@@ -205,7 +346,7 @@ with right_column:
 
 
 # =========================================================
-# ANALYZE TRANSACTION
+# ANALYZE TRANSACTIONS
 # =========================================================
 
 if analyze_button:
@@ -236,13 +377,16 @@ if analyze_button:
                 )
 
                 with st.spinner(
-                    "CatatCuan sedang memahami ceritamu..."
+                    "CatatCuan sedang "
+                    "memahami ceritamu..."
                 ):
                     result = analyze_transactions(
                         api_key=api_key,
                         user_input=(
                             transaction_text
-                            .strip()[:MAX_INPUT_LENGTH]
+                            .strip()[
+                                :MAX_INPUT_LENGTH
+                            ]
                         ),
                     )
 
@@ -409,14 +553,12 @@ if ask_button:
                     "CatatCuan sedang "
                     "menganalisis keuanganmu..."
                 ):
-                    answer = (
-                        ask_financial_assistant(
-                            api_key=api_key,
-                            question=question.strip(),
-                            transactions=(
-                                st.session_state.transactions
-                            ),
-                        )
+                    answer = ask_financial_assistant(
+                        api_key=api_key,
+                        question=question.strip(),
+                        transactions=(
+                            st.session_state.transactions
+                        ),
                     )
 
                 st.session_state.chat_history.extend(
@@ -501,10 +643,9 @@ with reset_column:
 
 st.markdown(
     """
-    <div class="footer-copy">
-        CatatCuan AI •
-        Catat keuangan semudah bercerita.
-    </div>
-    """,
+<div class="footer-copy">
+    CatatCuan AI • Catat keuangan semudah bercerita.
+</div>
+""",
     unsafe_allow_html=True,
 )
