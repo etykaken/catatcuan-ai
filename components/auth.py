@@ -4,33 +4,33 @@ import streamlit as st
 def render_auth() -> tuple[str, str, str, bool]:
     st.markdown(
         """
-        <div class="auth-shell">
-            <div class="auth-brand">
-                <div class="auth-kicker">CatatCuan AI</div>
+<div class="auth-shell">
+    <div class="auth-brand">
+        <div class="auth-kicker">CatatCuan AI</div>
 
-                <h1 class="auth-title">
-                    Catat keuangan<br>
-                    semudah bercerita.
-                </h1>
+        <h1 class="auth-title">
+            Catat keuangan<br>
+            semudah bercerita.
+        </h1>
 
-                <p class="auth-description">
-                    Masuk untuk melanjutkan pencatatan transaksi,
-                    melihat kondisi usaha, dan mendapatkan insight
-                    keuangan dari CatatCuan.
-                </p>
+        <p class="auth-description">
+            Masuk untuk melanjutkan pencatatan usahamu, melihat ringkasan keuangan,
+            dan mendapatkan insight yang lebih mudah dipahami.
+        </p>
 
-                <div class="auth-message">
-                    Tell your story. We'll handle the numbers.
-                </div>
-            </div>
+        <div class="auth-message">
+            Ceritakan transaksimu. Biar CatatCuan yang urus angkanya.
         </div>
-        """,
+    </div>
+</div>
+""",
         unsafe_allow_html=True,
     )
 
     tab_login, tab_signup = st.tabs(
         ["Masuk", "Buat akun"]
     )
+
 
     email = ""
     password = ""
