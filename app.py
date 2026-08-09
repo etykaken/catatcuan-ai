@@ -167,6 +167,34 @@ if analyze_button:
                             )
                         )
 
+if st.session_state.pending_transactions:
+    save_button, cancel_button = render_transaction_preview(
+        st.session_state.pending_transactions
+    )
+
+    if cancel_button:
+        st.session_state.pending_transactions = []
+        st.rerun()
+
+    if save_button:
+        transactions_to_save = (
+            st.session_state.pending_transactions.copy()
+        )
+
+        st.session_state.transactions.extend(
+            transactions_to_save
+        )
+
+        st.session_state.pending_transactions = []
+
+        st.success(
+            f"{len(transactions_to_save)} transaksi berhasil disimpan."
+        )
+
+        st.rerun()
+
+
+
 render_insight_and_chart(
     dataframe,
     total_income,
