@@ -112,7 +112,10 @@ if "last_request_time" not in st.session_state:
 
 if "last_chat_request_time" not in st.session_state:
     st.session_state.last_chat_request_time = 0.0
-
+    
+if "language" not in st.session_state:
+    st.session_state.language = "id"
+    
 
 # =========================================================
 # GROQ API KEY
