@@ -261,6 +261,38 @@ with auth_column:
 # HEADER
 # =========================================================
 
+language_column, _ = st.columns(
+    [1, 5]
+)
+
+with language_column:
+    language_choice = st.selectbox(
+        "Language",
+        options=["ID", "EN"],
+        index=(
+            0
+            if st.session_state.language == "id"
+            else 1
+        ),
+        key="language_selector",
+        label_visibility="collapsed",
+    )
+
+    selected_language = (
+        "id"
+        if language_choice == "ID"
+        else "en"
+    )
+
+    if (
+        selected_language
+        != st.session_state.language
+    ):
+        st.session_state.language = (
+            selected_language
+        )
+        st.rerun()
+
 render_header()
 
 
