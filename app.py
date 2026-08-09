@@ -13,6 +13,7 @@ from components.insight_chart import render_insight_and_chart
 from components.summary import render_summary
 from components.transaction_input import render_transaction_input
 from components.transaction_preview import render_transaction_preview
+from utils.i18n import t
 
 from config import (
     FAVICON_PATH,
