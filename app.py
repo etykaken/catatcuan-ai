@@ -99,13 +99,6 @@ if st.session_state.auth_mode:
     st.stop()
 
 
-try:
-    if test_connection():
-        st.success("Database connected")
-except Exception as error:
-    st.error(str(error))
-
-
 if st.session_state.transactions:
     dataframe = pd.DataFrame(st.session_state.transactions)
 else:
