@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from components.auth import render_auth
 from components.chat import render_chat
 from components.export import render_export
 from components.header import render_header
