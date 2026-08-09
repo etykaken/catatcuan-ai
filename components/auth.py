@@ -16,50 +16,43 @@ def render_auth() -> tuple[str, str, str, bool]:
     # LEFT — BRAND / VALUE
     # =========================
     with left_column:
-        st.markdown(
-            """
-<div class="auth-copy">
-    <div class="auth-eyebrow">CATATCUAN AI</div>
+        st.caption("CATATCUAN AI")
 
-    <h1 class="auth-headline">
-        Catat keuangan<br>
-        semudah bercerita.
-    </h1>
+        st.title(
+            "Catat keuangan "
+            "semudah bercerita."
+        )
 
-    <div class="auth-subcopy">
-        Nggak perlu paham istilah akuntansi.
-        Ceritakan transaksi usahamu seperti biasa,
-        CatatCuan bantu mengubahnya menjadi catatan
-        keuangan yang lebih rapi dan mudah dipahami.
-    </div>
+        st.write(
+            "Nggak perlu paham istilah akuntansi. "
+            "Ceritakan transaksi usahamu seperti biasa. "
+            "CatatCuan bantu mengubahnya menjadi catatan "
+            "keuangan yang lebih rapi dan mudah dipahami."
+        )
 
-    <div class="auth-points">
-        <div class="auth-point">
-            <span class="auth-point-dot">✓</span>
-            Catat transaksi dengan bahasa sehari-hari
-        </div>
+        st.write("")
 
-        <div class="auth-point">
-            <span class="auth-point-dot">✓</span>
-            Lihat ringkasan pemasukan dan pengeluaran
-        </div>
+        st.write(
+            "✓  Catat transaksi dengan bahasa sehari-hari"
+        )
 
-        <div class="auth-point">
-            <span class="auth-point-dot">✓</span>
-            Dapatkan insight keuangan yang lebih mudah dipahami
-        </div>
-    </div>
+        st.write(
+            "✓  Lihat ringkasan pemasukan dan pengeluaran"
+        )
 
-    <div class="auth-tagline">
-        Ceritakan transaksimu. Biar CatatCuan yang urus angkanya.
-    </div>
-</div>
-""",
-            unsafe_allow_html=True,
+        st.write(
+            "✓  Dapatkan insight keuangan yang mudah dipahami"
+        )
+
+        st.write("")
+
+        st.caption(
+            "Ceritakan transaksimu. "
+            "Biar CatatCuan yang urus angkanya."
         )
 
     # =========================
-    # RIGHT — AUTH FORM
+    # RIGHT — AUTH
     # =========================
     with right_column:
         with st.container(border=True):
@@ -71,12 +64,11 @@ def render_auth() -> tuple[str, str, str, bool]:
             # LOGIN
             # =========================
             with tab_login:
-                st.markdown(
-                    "## Selamat datang kembali"
-                )
+                st.header("Selamat datang kembali")
 
                 st.caption(
-                    "Masuk untuk melanjutkan pencatatan usahamu."
+                    "Masuk untuk melanjutkan "
+                    "pencatatan usahamu."
                 )
 
                 login_email = st.text_input(
@@ -122,9 +114,7 @@ def render_auth() -> tuple[str, str, str, bool]:
             # SIGN UP
             # =========================
             with tab_signup:
-                st.markdown(
-                    "## Mulai pakai CatatCuan"
-                )
+                st.header("Mulai pakai CatatCuan")
 
                 st.caption(
                     "Buat akun untuk menyimpan dan "
