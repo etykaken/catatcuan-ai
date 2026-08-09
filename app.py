@@ -4,7 +4,6 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from components.auth import render_auth
 from components.chat import render_chat
 from components.export import render_export
 from components.header import render_header
@@ -24,12 +23,6 @@ from config import (
 from services.ai_service import (
     analyze_transactions,
     ask_financial_assistant,
-)
-
-from services.supabase_service import (
-    SupabaseServiceError,
-    sign_in,
-    sign_up,
 )
 
 from utils.security import redact_secret_like_strings
@@ -92,15 +85,6 @@ except (FileNotFoundError, KeyError):
 # SESSION STATE
 # =========================================================
 
-if "user" not in st.session_state:
-    st.session_state.user = None
-
-if "access_token" not in st.session_state:
-    st.session_state.access_token = None
-
-if "refresh_token" not in st.session_state:
-    st.session_state.refresh_token = None
-
 if "transactions" not in st.session_state:
     st.session_state.transactions = []
 
@@ -130,98 +114,7 @@ def get_api_key() -> str | None:
             "GROQ_API_KEY belum dipasang "
             "di Streamlit Secrets."
         )
-
         return None
-
-
-# =========================================================
-# AUTH GATE
-# =========================================================
-
-if st.session_state.user is None:
-    mode, email, password, submitted = (
-        render_auth()
-    )
-
-    if submitted:
-        try:
-            # =========================
-            # SIGN UP
-            # =========================
-
-            if mode == "signup":
-                response = sign_up(
-                    email=email,
-                    password=password,
-                )
-
-                if response.session:
-                    st.session_state.user = (
-                        response.user
-                    )
-
-                    st.session_state.access_token = (
-                        response.session.access_token
-                    )
-
-                    st.session_state.refresh_token = (
-                        response.session.refresh_token
-                    )
-
-                    st.success(
-                        "Akun berhasil dibuat. "
-                        "Selamat datang di CatatCuan."
-                    )
-
-                    st.rerun()
-
-                else:
-                    st.success(
-                        "Akun berhasil dibuat. "
-                        "Silakan cek email dan "
-                        "konfirmasi akunmu sebelum masuk."
-                    )
-
-            # =========================
-            # LOGIN
-            # =========================
-
-            elif mode == "login":
-                response = sign_in(
-                    email=email,
-                    password=password,
-                )
-
-                st.session_state.user = (
-                    response.user
-                )
-
-                if response.session:
-                    st.session_state.access_token = (
-                        response.session.access_token
-                    )
-
-                    st.session_state.refresh_token = (
-                        response.session.refresh_token
-                    )
-
-                st.success(
-                    "Berhasil masuk ke CatatCuan."
-                )
-
-                st.rerun()
-
-        except SupabaseServiceError as error:
-            st.error(str(error))
-
-        except Exception:
-            st.error(
-                "Terjadi kesalahan saat memproses akun."
-            )
-
-    # Kalau belum login,
-    # jangan render dashboard.
-    st.stop()
 
 
 # =========================================================
@@ -254,7 +147,7 @@ else:
 
 
 # =========================================================
-# SUMMARY CALCULATION
+# FINANCIAL SUMMARY
 # =========================================================
 
 total_income = (
@@ -279,15 +172,10 @@ total_expense = (
     else 0
 )
 
-net_result = (
-    total_income
-    - total_expense
-)
+net_result = total_income - total_expense
 
 expense_ratio = (
-    total_expense
-    / total_income
-    * 100
+    total_expense / total_income * 100
     if total_income > 0
     else 0.0
 )
@@ -348,15 +236,13 @@ if analyze_button:
                 )
 
                 with st.spinner(
-                    "CatatCuan sedang "
-                    "memahami ceritamu..."
+                    "CatatCuan sedang memahami ceritamu..."
                 ):
                     result = analyze_transactions(
                         api_key=api_key,
                         user_input=(
-                            transaction_text.strip()[
-                                :MAX_INPUT_LENGTH
-                            ]
+                            transaction_text
+                            .strip()[:MAX_INPUT_LENGTH]
                         ),
                     )
 
@@ -422,7 +308,7 @@ if analyze_button:
 
 
 # =========================================================
-# TRANSACTION CONFIRMATION
+# EDITABLE TRANSACTION PREVIEW
 # =========================================================
 
 if st.session_state.pending_transactions:
@@ -458,7 +344,7 @@ if st.session_state.pending_transactions:
 
 
 # =========================================================
-# AI INSIGHT + CASH FLOW
+# FINANCIAL INSIGHT + CASH FLOW
 # =========================================================
 
 render_insight_and_chart(
@@ -471,7 +357,7 @@ render_insight_and_chart(
 
 
 # =========================================================
-# CATATCUAN CHAT
+# CATATCUAN AI CHAT
 # =========================================================
 
 (
@@ -523,21 +409,21 @@ if ask_button:
                     "CatatCuan sedang "
                     "menganalisis keuanganmu..."
                 ):
-                    answer = ask_financial_assistant(
-                        api_key=api_key,
-                        question=question.strip(),
-                        transactions=(
-                            st.session_state.transactions
-                        ),
+                    answer = (
+                        ask_financial_assistant(
+                            api_key=api_key,
+                            question=question.strip(),
+                            transactions=(
+                                st.session_state.transactions
+                            ),
+                        )
                     )
 
                 st.session_state.chat_history.extend(
                     [
                         {
                             "role": "user",
-                            "message": (
-                                question.strip()
-                            ),
+                            "message": question.strip(),
                         },
                         {
                             "role": "assistant",
@@ -567,7 +453,7 @@ if ask_button:
 
 
 # =========================================================
-# HISTORY
+# TRANSACTION HISTORY
 # =========================================================
 
 render_history(
@@ -615,9 +501,10 @@ with reset_column:
 
 st.markdown(
     """
-<div class="footer-copy">
-    CatatCuan AI • Made to make finance feel simpler.
-</div>
-""",
+    <div class="footer-copy">
+        CatatCuan AI •
+        Catat keuangan semudah bercerita.
+    </div>
+    """,
     unsafe_allow_html=True,
 )
