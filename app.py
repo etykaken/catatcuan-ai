@@ -168,8 +168,10 @@ if analyze_button:
                         )
 
 if st.session_state.pending_transactions:
-    save_button, cancel_button = render_transaction_preview(
-        st.session_state.pending_transactions
+    edited_transactions, save_button, cancel_button = (
+        render_transaction_preview(
+            st.session_state.pending_transactions
+        )
     )
 
     if cancel_button:
