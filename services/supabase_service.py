@@ -7,19 +7,17 @@ class SupabaseServiceError(Exception):
 
 
 def get_supabase_client() -> Client:
-    url = str(st.secrets.get("https://fpaftvmrlmneqjysjnoi.supabase.co", "")).strip()
-    key = str(st.secrets.get("sb_publishable_SOGDx0GAA6tvsr6EAfiSmg_XMRtI1Pv", "")).strip()
+    url = str(st.secrets.get("SUPABASE_URL", "")).strip()
+    key = str(st.secrets.get("SUPABASE_KEY", "")).strip()
 
     if not url:
         raise SupabaseServiceError(
             "SUPABASE_URL belum tersedia di Streamlit Secrets."
         )
-
     if not key:
         raise SupabaseServiceError(
             "SUPABASE_KEY belum tersedia di Streamlit Secrets."
         )
-
     if not url.startswith("https://"):
         raise SupabaseServiceError(
             "Format SUPABASE_URL tidak valid."
@@ -27,7 +25,6 @@ def get_supabase_client() -> Client:
 
     try:
         return create_client(url, key)
-
     except Exception as error:
         raise SupabaseServiceError(
             f"Supabase client gagal dibuat: "
@@ -37,11 +34,9 @@ def get_supabase_client() -> Client:
 
 def test_connection() -> bool:
     client = get_supabase_client()
-
     try:
         client.table("transactions").select("id").limit(1).execute()
         return True
-
     except Exception as error:
         raise SupabaseServiceError(
             f"Koneksi database gagal: "
