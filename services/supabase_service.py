@@ -7,15 +7,31 @@ class SupabaseServiceError(Exception):
 
 
 def get_supabase_client() -> Client:
-    try:
-        url = st.secrets["https://fpaftvmrlmneqjysjnoi.supabase.co"]
-        key = st.secrets["sb_publishable_SOGDx0GAA6tvsr6EAfiSmg_XMRtI1Pv"]
+    url = str(st.secrets.get("https://fpaftvmrlmneqjysjnoi.supabase.co", "")).strip()
+    key = str(st.secrets.get("sb_publishable_SOGDx0GAA6tvsr6EAfiSmg_XMRtI1Pv", "")).strip()
 
+    if not url:
+        raise SupabaseServiceError(
+            "SUPABASE_URL belum tersedia di Streamlit Secrets."
+        )
+
+    if not key:
+        raise SupabaseServiceError(
+            "SUPABASE_KEY belum tersedia di Streamlit Secrets."
+        )
+
+    if not url.startswith("https://"):
+        raise SupabaseServiceError(
+            "Format SUPABASE_URL tidak valid."
+        )
+
+    try:
         return create_client(url, key)
 
     except Exception as error:
         raise SupabaseServiceError(
-            "Supabase gagal diinisialisasi."
+            f"Supabase client gagal dibuat: "
+            f"{type(error).__name__}: {error}"
         ) from error
 
 
@@ -28,5 +44,6 @@ def test_connection() -> bool:
 
     except Exception as error:
         raise SupabaseServiceError(
-            "Koneksi database gagal."
+            f"Koneksi database gagal: "
+            f"{type(error).__name__}: {error}"
         ) from error
