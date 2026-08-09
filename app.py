@@ -49,6 +49,9 @@ try:
 except (FileNotFoundError, KeyError):
     DEBUG_MODE = False
 
+if "auth_mode" not in st.session_state:
+    st.session_state.auth_mode = False
+    
 if "transactions" not in st.session_state:
     st.session_state.transactions = []
     
