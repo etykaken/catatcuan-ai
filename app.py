@@ -25,7 +25,6 @@ from services.ai_service import (
     ask_financial_assistant,
 )
 
-from services.supabase_service import test_connection
 
 from utils.security import redact_secret_like_strings
 from utils.transactions import validate_transactions
