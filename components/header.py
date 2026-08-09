@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import streamlit as st
 
 
@@ -8,145 +10,156 @@ def render_header() -> None:
     if "auth_mode" not in st.session_state:
         st.session_state.auth_mode = False
 
-    top_left, top_right = st.columns(
-        [4.8, 2.2],
+    if "user" not in st.session_state:
+        st.session_state.user = None
+
+    # =====================================================
+    # TOP HEADER
+    # =====================================================
+
+    brand_col, language_col, account_col = st.columns(
+        [4.5, 1.2, 1.8],
+        gap="small",
         vertical_alignment="center",
     )
 
-    # =========================
+    # =====================================================
     # BRAND
-    # =========================
-    with top_left:
-        st.markdown(
-            """
-<div class="topbar-brand">
-    <div class="brand-logo">🤖</div>
+    # =====================================================
 
-    <div>
-        <div class="brand-name">
-            CatatCuan AI
-        </div>
-
-        <div class="brand-subtitle">
-            AI Financial Assistant
-        </div>
-    </div>
-</div>
-""",
-            unsafe_allow_html=True,
+    with brand_col:
+        logo_path = (
+            Path(__file__).resolve().parents[1]
+            / "assets"
+            / "logo.png"
         )
 
-    # =========================
-    # ACTIONS
-    # =========================
-    with top_right:
-        lang_col, auth_col = st.columns(
-            [0.7, 1.5],
+        logo_col, name_col = st.columns(
+            [0.6, 4.4],
             gap="small",
+            vertical_alignment="center",
         )
 
-        with lang_col:
-            language_choice = st.radio(
-                "Language",
-                options=["ID", "EN"],
-                index=(
-                    0
-                    if st.session_state.language == "id"
-                    else 1
-                ),
-                horizontal=True,
-                label_visibility="collapsed",
-                key="header_language",
-            )
-
-            selected_language = (
-                "id"
-                if language_choice == "ID"
-                else "en"
-            )
-
-            if (
-                selected_language
-                != st.session_state.language
-            ):
-                st.session_state.language = (
-                    selected_language
+        with logo_col:
+            if logo_path.exists():
+                st.image(
+                    str(logo_path),
+                    width=46,
                 )
+            else:
+                st.markdown("### 🤖")
+
+        with name_col:
+            st.markdown("### CatatCuan AI")
+            st.caption("AI Financial Assistant")
+
+    # =====================================================
+    # LANGUAGE
+    # =====================================================
+
+    with language_col:
+        language_choice = st.radio(
+            "Language",
+            options=["ID", "EN"],
+            index=(
+                0
+                if st.session_state.language == "id"
+                else 1
+            ),
+            horizontal=True,
+            label_visibility="collapsed",
+            key="header_language",
+        )
+
+        new_language = (
+            "id"
+            if language_choice == "ID"
+            else "en"
+        )
+
+        if new_language != st.session_state.language:
+            st.session_state.language = new_language
+            st.rerun()
+
+    # =====================================================
+    # ACCOUNT
+    # =====================================================
+
+    with account_col:
+        if st.session_state.user is None:
+            auth_label = (
+                "Masuk / Buat akun"
+                if st.session_state.language == "id"
+                else "Sign in / Create account"
+            )
+
+            if st.button(
+                auth_label,
+                use_container_width=True,
+                key="header_auth_button",
+            ):
+                st.session_state.auth_mode = True
                 st.rerun()
 
-        with auth_col:
-            if st.session_state.get("user") is None:
-                if st.button(
-                    "Masuk / Buat akun"
-                    if st.session_state.language == "id"
-                    else "Sign in / Create account",
-                    use_container_width=True,
-                    key="header_auth_button",
-                ):
-                    st.session_state.auth_mode = True
-                    st.rerun()
+        else:
+            user_email = getattr(
+                st.session_state.user,
+                "email",
+                "",
+            )
 
-            else:
-                user = st.session_state.user
-                user_email = getattr(
-                    user,
-                    "email",
-                    "",
-                )
+            st.caption(
+                user_email
+                if user_email
+                else "Account"
+            )
 
-                st.caption(
-                    user_email
-                    if user_email
-                    else "Account"
-                )
+    st.write("")
 
-    # =========================
+    # =====================================================
     # HERO
-    # =========================
+    # =====================================================
 
-    if st.session_state.language == "id":
-        hero_title = (
-            "Catat pemasukan &amp; pengeluaran<br>"
-            "semudah <span>bercerita.</span>"
-        )
-
-        hero_description = (
-            "Ceritakan transaksi usahamu dengan bahasa sehari-hari. "
-            "CatatCuan membantu merapikan pencatatan dan memberikan "
-            "insight keuangan yang lebih mudah dipahami."
-        )
-
-    else:
-        hero_title = (
-            "Track income &amp; expenses<br>"
-            "as naturally as <span>telling a story.</span>"
-        )
-
-        hero_description = (
-            "Describe your daily business transactions naturally. "
-            "CatatCuan helps organize your records and turn them "
-            "into clearer financial insights."
-        )
-
-    st.markdown(
-        f"""
-<section class="hero">
-    <div class="hero-copy">
-
-        <div class="hero-title">
-            {hero_title}
-        </div>
-
-        <div class="hero-description">
-            {hero_description}
-        </div>
-
-    </div>
-
-    <div class="hero-emoji">
-        🤖
-    </div>
-</section>
-""",
-        unsafe_allow_html=True,
+    hero_text_col, hero_icon_col = st.columns(
+        [5, 1],
+        gap="large",
+        vertical_alignment="center",
     )
+
+    with hero_text_col:
+        if st.session_state.language == "id":
+            st.title(
+                "Catat pemasukan & pengeluaran "
+                "semudah bercerita."
+            )
+
+            st.write(
+                "Ceritakan transaksi usahamu dengan bahasa "
+                "sehari-hari. CatatCuan membantu merapikan "
+                "pencatatan dan memberikan insight keuangan "
+                "yang lebih mudah dipahami."
+            )
+
+        else:
+            st.title(
+                "Track income & expenses "
+                "as naturally as telling a story."
+            )
+
+            st.write(
+                "Describe your daily business transactions "
+                "naturally. CatatCuan helps organize your "
+                "records and turn them into clearer "
+                "financial insights."
+            )
+
+    with hero_icon_col:
+        if logo_path.exists():
+            st.image(
+                str(logo_path),
+                width=100,
+            )
+        else:
+            st.markdown("# 🤖")
+
+    st.write("")
