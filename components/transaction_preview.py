@@ -4,9 +4,10 @@ import streamlit as st
 
 def render_transaction_preview(
     transactions: list[dict],
-) -> tuple[bool, bool]:
+) -> tuple[list[dict], bool, bool]:
+
     if not transactions:
-        return False, False
+        return [], False, False
 
     with st.container(border=True):
         st.markdown(
@@ -16,7 +17,8 @@ def render_transaction_preview(
             </div>
 
             <div class="section-helper">
-                Periksa dulu sebelum transaksi disimpan.
+                Periksa dan koreksi jika ada yang kurang tepat
+                sebelum transaksi disimpan.
             </div>
             """,
             unsafe_allow_html=True,
@@ -24,47 +26,54 @@ def render_transaction_preview(
 
         preview_df = pd.DataFrame(transactions)
 
-        visible_columns = [
-            "Deskripsi",
-            "Kategori",
-            "Tipe",
-            "Jumlah",
-        ]
-
-        preview_df = preview_df[
+        editable_df = preview_df[
             [
-                column
-                for column in visible_columns
-                if column in preview_df.columns
+                "Deskripsi",
+                "Kategori",
+                "Tipe",
+                "Jumlah",
             ]
-        ]
+        ].copy()
 
-        st.dataframe(
-            preview_df,
+        edited_df = st.data_editor(
+            editable_df,
             use_container_width=True,
             hide_index=True,
+            num_rows="fixed",
             column_config={
                 "Deskripsi": st.column_config.TextColumn(
                     "Transaksi",
                     width="large",
+                    required=True,
                 ),
                 "Kategori": st.column_config.TextColumn(
                     "Kategori",
                     width="medium",
+                    required=True,
                 ),
-                "Tipe": st.column_config.TextColumn(
+                "Tipe": st.column_config.SelectboxColumn(
                     "Tipe",
+                    options=[
+                        "Pemasukan",
+                        "Pengeluaran",
+                    ],
+                    required=True,
                     width="small",
                 ),
                 "Jumlah": st.column_config.NumberColumn(
                     "Nominal",
+                    min_value=1,
+                    step=1000,
                     format="Rp %d",
+                    required=True,
                 ),
             },
+            key="transaction_preview_editor",
         )
 
         st.caption(
-            f"{len(transactions)} transaksi ditemukan oleh CatatCuan."
+            f"{len(transactions)} transaksi ditemukan. "
+            "Kamu tetap punya kontrol sebelum data disimpan."
         )
 
         cancel_column, save_column = st.columns(
@@ -87,4 +96,31 @@ def render_transaction_preview(
                 key="save_pending_transactions",
             )
 
-    return save_button, cancel_button
+    edited_transactions = []
+
+    for index, row in edited_df.iterrows():
+        original = transactions[index].copy()
+
+        original["Deskripsi"] = str(
+            row["Deskripsi"]
+        ).strip()
+
+        original["Kategori"] = str(
+            row["Kategori"]
+        ).strip()
+
+        original["Tipe"] = str(
+            row["Tipe"]
+        )
+
+        original["Jumlah"] = int(
+            row["Jumlah"]
+        )
+
+        edited_transactions.append(original)
+
+    return (
+        edited_transactions,
+        save_button,
+        cancel_button,
+    )
