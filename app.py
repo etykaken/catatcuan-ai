@@ -10,6 +10,7 @@ from components.export import render_export
 from components.header import render_header
 from components.history import render_history
 from components.insight_chart import render_insight_and_chart
+from components.navigation import render_navigation
 from components.summary import render_summary
 from components.transaction_input import render_transaction_input
 from components.transaction_preview import render_transaction_preview
@@ -291,6 +292,20 @@ if st.session_state.auth_mode:
 # =========================================================
 
 render_header()
+
+active_view = render_navigation()
+
+if active_view != "Dashboard":
+    st.markdown(
+        f'<div class="view-placeholder" role="status">'
+        f'<div class="view-placeholder-title">{active_view}</div>'
+        '<div class="view-placeholder-copy">'
+        'Halaman ini sedang disiapkan untuk tahap redesign berikutnya. '
+        'Semua fitur yang sudah ada tetap tersedia di Dashboard.'
+        '</div></div>',
+        unsafe_allow_html=True,
+    )
+    st.stop()
 
 
 # =========================================================

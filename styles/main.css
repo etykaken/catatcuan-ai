@@ -130,6 +130,70 @@ header {
     font-weight: 700;
 }
 
+/* Primary app-shell navigation */
+.st-key-active_view {
+    margin: 0 0 18px;
+    padding: 6px;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.st-key-active_view [role="radiogroup"] {
+    flex-wrap: nowrap;
+    gap: 4px;
+    min-width: max-content;
+}
+
+.st-key-active_view label {
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.st-key-active_view label:has(input:checked) {
+    color: var(--ink);
+    background: var(--surface-soft);
+}
+
+.st-key-active_view [data-testid="stMarkdownContainer"] p {
+    font-size: inherit;
+}
+
+.view-placeholder {
+    min-height: 240px;
+    display: grid;
+    place-content: center;
+    margin-top: 8px;
+    padding: 32px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    text-align: center;
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.view-placeholder-title {
+    color: var(--ink);
+    font-size: 24px;
+    font-weight: 850;
+    letter-spacing: -0.03em;
+}
+
+.view-placeholder-copy {
+    max-width: 520px;
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
 .hero {
     min-height: 220px;
     display: flex;
