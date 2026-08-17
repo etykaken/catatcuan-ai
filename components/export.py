@@ -20,8 +20,8 @@ def render_export(
             st.markdown(
                 """
                 <div class="section-title">
-                    <span class="section-number">5</span>
-                    📄 Export Laporan
+                    <span class="section-icon">↗</span>
+                    Laporan Keuangan
                 </div>
                 <div class="section-helper">
                     Unduh transaksi dan ringkasan dalam format Excel.

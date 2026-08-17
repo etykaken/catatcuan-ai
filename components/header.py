@@ -1,3 +1,4 @@
+import base64
 from pathlib import Path
 
 import streamlit as st
@@ -114,52 +115,48 @@ def render_header() -> None:
                 else "Account"
             )
 
-    st.write("")
+    st.markdown('<div class="header-divider"></div>', unsafe_allow_html=True)
 
     # =====================================================
     # HERO
     # =====================================================
 
-    hero_text_col, hero_icon_col = st.columns(
-        [5, 1],
-        gap="large",
-        vertical_alignment="center",
+    if st.session_state.language == "id":
+        kicker = "Dashboard keuangan"
+        title = "Selamat datang di CatatCuan 👋"
+        description = (
+            "Pantau arus kas, catat transaksi, dan pahami kondisi "
+            "usaha dalam satu dashboard sederhana."
+        )
+    else:
+        kicker = "Financial dashboard"
+        title = "Welcome to CatatCuan 👋"
+        description = (
+            "Track cash flow, record transactions, and understand "
+            "your business in one simple dashboard."
+        )
+
+    if logo_path.exists():
+        logo_data = base64.b64encode(logo_path.read_bytes()).decode("ascii")
+        hero_visual = (
+            f'<img src="data:image/png;base64,{logo_data}" '
+            'alt="CatatCuan" class="hero-logo">'
+        )
+    else:
+        hero_visual = '<div class="hero-emoji">🤖</div>'
+
+    st.markdown(
+        f"""
+        <div class="hero">
+            <div class="hero-copy">
+                <div class="hero-kicker">{kicker}</div>
+                <div class="hero-title">{title}</div>
+                <div class="hero-description">{description}</div>
+            </div>
+            <div class="hero-visual">{hero_visual}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-
-    with hero_text_col:
-        if st.session_state.language == "id":
-            st.title(
-                "Catat pemasukan & pengeluaran "
-                "semudah bercerita."
-            )
-
-            st.write(
-                "Ceritakan transaksi usahamu dengan bahasa "
-                "sehari-hari. CatatCuan membantu merapikan "
-                "pencatatan dan memberikan insight keuangan "
-                "yang lebih mudah dipahami."
-            )
-
-        else:
-            st.title(
-                "Track income & expenses "
-                "as naturally as telling a story."
-            )
-
-            st.write(
-                "Describe your daily business transactions "
-                "naturally. CatatCuan helps organize your "
-                "records and turn them into clearer "
-                "financial insights."
-            )
-
-    with hero_icon_col:
-        if logo_path.exists():
-            st.image(
-                str(logo_path),
-                width=100,
-            )
-        else:
-            st.markdown("# 🤖")
 
     st.write("")

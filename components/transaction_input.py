@@ -45,9 +45,15 @@ def render_transaction_input() -> tuple[str, bool]:
         button_text = "Record transactions →"
 
     with st.container(border=True):
-        st.markdown(f"### 1  {section_title}")
-
-        st.caption(helper_text)
+        st.markdown(
+            f'<div class="section-title"><span class="section-icon">＋</span>'
+            f'{section_title}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="section-helper">{helper_text}</div>',
+            unsafe_allow_html=True,
+        )
 
         st.write("")
 

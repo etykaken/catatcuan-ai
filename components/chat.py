@@ -45,8 +45,8 @@ def render_chat() -> tuple[str, bool, bool]:
             st.markdown(
                 """
                 <div class="section-title">
-                    <span class="section-number">3</span>
-                    💬 Tanya CatatCuan AI
+                    <span class="section-icon">✦</span>
+                    AI Assistant
                 </div>
                 """,
                 unsafe_allow_html=True,
