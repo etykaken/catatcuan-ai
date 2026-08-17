@@ -13,7 +13,7 @@ def render_export(
     net_result: int,
     expense_ratio: float,
 ) -> None:
-    with st.container(border=True):
+    with st.container(border=True, key="export_card"):
         left, right = st.columns([4, 1.2])
 
         with left:

@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import streamlit as st
 from utils.insights import build_insights
+import html
 
 
 def _seven_day_data(dataframe: pd.DataFrame) -> pd.DataFrame:
@@ -38,3 +39,27 @@ def render_insight_and_chart(dataframe: pd.DataFrame, total_income: int, total_e
                 st.markdown('<div class="insight-empty"><div>✦</div><strong>Insight menunggu datamu</strong><p>Simpan transaksi pertama untuk mendapatkan analisis keuangan.</p></div>' if language == "id" else '<div class="insight-empty"><div>✦</div><strong>Insights are waiting for your data</strong><p>Save your first transaction to get a financial analysis.</p></div>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="primary-insight">{items[0]}</div><p class="supporting-insight">{items[1]}</p><div class="recommendation"><b>💡 REKOMENDASI</b><br>{items[2]}</div>', unsafe_allow_html=True)
+
+
+def render_mobile_insight_page(dataframe: pd.DataFrame, total_income: int, total_expense: int, net_result: int, expense_ratio: float) -> None:
+    """Mobile-only presentation of the existing locally calculated insights."""
+    language = st.session_state.get("language", "id")
+    empty = dataframe.empty
+    items = build_insights(dataframe, total_income, total_expense, net_result, expense_ratio) if not empty else []
+    if empty:
+        primary = "Insight menunggu datamu" if language == "id" else "Insights are waiting for your data"
+        supporting = "Simpan transaksi pertama untuk mendapatkan analisis keuangan." if language == "id" else "Save your first transaction to get a financial analysis."
+        recommendation = "Belum ada rekomendasi yang tersedia." if language == "id" else "No recommendation is available yet."
+    else:
+        primary, supporting, recommendation = (html.escape(str(value)) for value in items[:3])
+    st.markdown(
+        f'''<main class="mobile-insight-page">
+          <header><a href="?view=home" aria-label="Kembali">←</a><strong>Insight AI</strong><span></span></header>
+          <div class="mobile-insight-tabs"><b>Insight</b><span>Rekomendasi</span><span>Performa</span></div>
+          <section class="mobile-primary-insight"><small>Insight Utama</small><h2>{primary}</h2><p>{supporting}</p><i>↗</i></section>
+          <section class="mobile-recommendation"><span>▣</span><div><small>Rekomendasi untukmu</small><strong>{recommendation}</strong></div><b>›</b></section>
+          <h3>Insight Lainnya</h3>
+          <div class="mobile-insight-empty">Belum ada insight independen lainnya untuk ditampilkan.</div>
+        </main>''',
+        unsafe_allow_html=True,
+    )

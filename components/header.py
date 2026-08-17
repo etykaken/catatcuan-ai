@@ -92,11 +92,41 @@ def render_header() -> None:
 
     st.markdown(
         f"""
+        <div class="mobile-topbar">
+          <a class="mobile-brand" href="?view=home" aria-label="CatatCuan Beranda">
+            <span class="brand-spark">✦</span><strong>CatatCuan</strong><b>AI</b>
+          </a>
+          <span class="mobile-bell" aria-label="Notifikasi">♧<i></i></span>
+        </div>
+        <div class="mobile-greeting">
+          <h1>{html.escape("Hai, " + first_name + "! 👋" if language == "id" else "Hi, " + first_name + "! 👋")}</h1>
+          <p>{html.escape("Catat transaksi hari ini, biar keuangan usahamu makin sehat." if language == "id" else helper)}</p>
+        </div>
         <header class="dashboard-header">
           <div><h1>{html.escape(greeting)}</h1><p>{html.escape(helper)}</p></div>
           <div class="header-actions"><div class="period-pill">▣&nbsp; {html.escape(period)}⌄</div>
           <div class="icon-pill" aria-label="Notifikasi">♧</div><div class="header-avatar">{html.escape(initials)}</div></div>
         </header>
         """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_mobile_navigation(active: str = "home") -> None:
+    """Render the compact mobile navigation; CSS keeps it off desktop."""
+    items = (
+        ("home", "⌂", "Beranda", "?view=home"),
+        ("transactions", "☷", "Transaksi", "?view=home#transaction-input"),
+        ("add", "+", "", "?view=home#transaction-input"),
+        ("insight", "✧", "Insight AI", "?view=insight"),
+        ("reports", "▤", "Laporan", "?view=home#reports"),
+    )
+    links = "".join(
+        f'<a class="mobile-nav-item {"active" if key == active else ""} {"mobile-add" if key == "add" else ""}" '
+        f'href="{href}"><span>{icon}</span>{label}</a>'
+        for key, icon, label, href in items
+    )
+    st.markdown(
+        f'<nav class="mobile-bottom-nav" aria-label="Navigasi utama mobile">{links}</nav>',
         unsafe_allow_html=True,
     )

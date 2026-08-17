@@ -13,6 +13,7 @@ def render_transaction_input() -> tuple[str, bool]:
         helper, placeholder = "Track finances as naturally as telling a story.", "Example: Bought 5 kg of sugar stock for Rp90,000"
         button = "➤  Record with AI  ✦"
     with st.container(border=True, key="transaction_input_card"):
+        st.markdown('<span id="transaction-input"></span>', unsafe_allow_html=True)
         st.markdown(f'<div class="card-eyebrow">{eyebrow}</div><h2 class="card-heading">{title}</h2><p class="card-helper">{helper}</p>', unsafe_allow_html=True)
         transaction_text = st.text_area("Transaction", placeholder=placeholder, height=92, max_chars=MAX_INPUT_LENGTH, label_visibility="collapsed", key="transaction_input_text")
         chips, action = st.columns([1.9, 1], gap="small", vertical_alignment="center")
