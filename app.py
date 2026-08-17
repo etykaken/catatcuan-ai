@@ -7,7 +7,7 @@ import streamlit as st
 from components.auth import render_auth
 from components.chat import render_chat
 from components.export import render_export
-from components.header import render_header
+from components.header import render_header, render_sidebar
 from components.history import render_history
 from components.insight_chart import render_insight_and_chart
 from components.summary import render_summary
@@ -48,7 +48,7 @@ st.set_page_config(
         else "🤖"
     ),
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 
@@ -287,9 +287,10 @@ if st.session_state.auth_mode:
 
 
 # =========================================================
-# HEADER
+# APPLICATION SHELL + HEADER
 # =========================================================
 
+render_sidebar()
 render_header()
 
 
@@ -360,30 +361,31 @@ expense_ratio = (
 
 
 # =========================================================
-# TRANSACTION INPUT + SUMMARY
+# TRANSACTION INPUT + PENDING PREVIEW
 # =========================================================
 
-left_column, right_column = st.columns(
-    [1, 1],
-    gap="medium",
-)
-
+left_column, right_column = st.columns([1.2, 1], gap="small")
 with left_column:
-
-    (
-        transaction_text,
-        analyze_button,
-    ) = render_transaction_input()
-
-
+    transaction_text, analyze_button = render_transaction_input()
 with right_column:
-
-    render_summary(
-        total_income,
-        total_expense,
-        net_result,
+    edited_transactions, save_button, cancel_button = render_transaction_preview(
+        st.session_state.pending_transactions
     )
 
+if cancel_button:
+    st.session_state.pending_transactions = []
+    st.rerun()
+
+if save_button:
+    st.session_state.transactions.extend(edited_transactions)
+    st.session_state.pending_transactions = []
+    message = (
+        f"{len(edited_transactions)} transaksi berhasil disimpan."
+        if st.session_state.language == "id"
+        else f"{len(edited_transactions)} transactions saved successfully."
+    )
+    st.success(message)
+    st.rerun()
 
 # =========================================================
 # ANALYZE TRANSACTIONS
@@ -563,55 +565,11 @@ if analyze_button:
 
 
 # =========================================================
-# EDITABLE TRANSACTION PREVIEW
+# FINANCIAL SUMMARY
 # =========================================================
 
-if st.session_state.pending_transactions:
-
-    (
-        edited_transactions,
-        save_button,
-        cancel_button,
-    ) = render_transaction_preview(
-        st.session_state.pending_transactions
-    )
-
-    if cancel_button:
-
-        st.session_state.pending_transactions = []
-
-        st.rerun()
-
-    if save_button:
-
-        transactions_to_save = (
-            edited_transactions
-        )
-
-        st.session_state.transactions.extend(
-            transactions_to_save
-        )
-
-        st.session_state.pending_transactions = []
-
-        if (
-            st.session_state.language
-            == "id"
-        ):
-
-            st.success(
-                f"{len(transactions_to_save)} "
-                "transaksi berhasil disimpan."
-            )
-
-        else:
-
-            st.success(
-                f"{len(transactions_to_save)} "
-                "transactions saved successfully."
-            )
-
-        st.rerun()
+with st.container(border=True, key="summary_card"):
+    render_summary(total_income, total_expense, net_result)
 
 
 # =========================================================
