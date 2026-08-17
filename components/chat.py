@@ -38,7 +38,7 @@ def _render_bubble(role: str, message: str) -> None:
 
 
 def render_chat() -> tuple[str, bool, bool]:
-    with st.container(border=True):
+    with st.container(border=True, key="chat_card"):
         header_left, header_right = st.columns([4, 1])
 
         with header_left:

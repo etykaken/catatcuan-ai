@@ -7,9 +7,9 @@ import streamlit as st
 from components.auth import render_auth
 from components.chat import render_chat
 from components.export import render_export
-from components.header import render_header, render_sidebar
+from components.header import render_header, render_mobile_navigation, render_sidebar
 from components.history import render_history
-from components.insight_chart import render_insight_and_chart
+from components.insight_chart import render_insight_and_chart, render_mobile_insight_page
 from components.summary import render_summary
 from components.transaction_input import render_transaction_input
 from components.transaction_preview import render_transaction_preview
@@ -358,6 +358,14 @@ expense_ratio = (
     if total_income > 0
     else 0.0
 )
+
+mobile_view = st.query_params.get("view", "home")
+if mobile_view == "insight":
+    render_mobile_insight_page(dataframe, total_income, total_expense, net_result, expense_ratio)
+    render_mobile_navigation("insight")
+    st.stop()
+
+render_mobile_navigation("home")
 
 
 # =========================================================

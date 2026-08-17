@@ -759,3 +759,113 @@ body, .stApp, [data-testid="stAppViewContainer"] { background: var(--bg); }
 .st-key-cashflow_card [data-testid="stVerticalBlockBorderWrapper"],.st-key-insight_card [data-testid="stVerticalBlockBorderWrapper"]{min-height:273px}.chart-empty,.insight-empty{height:205px;display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--muted);font-size:11px}.chart-empty span,.insight-empty div{font-size:28px;color:#a9cdb5;margin-bottom:8px}.insight-empty strong{font-size:13px;color:var(--ink)}.insight-empty p{max-width:260px;text-align:center;line-height:1.5}.primary-insight{font-size:16px;color:var(--ink);font-weight:650;margin:24px 0 10px}.supporting-insight{font-size:11px;line-height:1.5;color:#425067}.recommendation{margin-top:15px;padding:12px;border:1px solid #ccebd6;border-radius:12px;background:#f3fbf6;font-size:11px;line-height:1.5}.recommendation b{font-size:9px;color:#405065}
 .st-key-history_card{margin-top:2px}.history-empty{height:125px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted)}.history-empty span{font-size:24px;color:#a9cdb5}.history-empty strong{font-size:13px;color:var(--ink);margin:6px}.history-empty small{font-size:10px}.transaction-head,.transaction-row{display:grid;grid-template-columns:42px 2fr 1.1fr 1fr 1fr 1fr;align-items:center}.transaction-head{font-size:8px;color:var(--muted);padding:5px 6px}.transaction-row{min-height:38px;border-top:1px solid var(--line);font-size:10px;padding:0 6px;color:#6b778c}.transaction-row strong{font-size:11px;color:var(--ink)}.row-icon{width:26px;height:26px;display:grid;place-items:center;border-radius:9px}.row-icon.income,.category.income{color:var(--positive);background:var(--positive-soft)}.row-icon.expense,.category.expense{color:var(--negative);background:var(--negative-soft)}.category{padding:4px 8px;border-radius:12px;font-size:9px}.amount.income{color:var(--positive)}.amount.expense{color:var(--negative)}
 @media(max-width:900px){[data-testid="stSidebar"]{width:210px!important;min-width:210px!important}.block-container{padding:16px}.header-actions{display:none}.sidebar-ai-card{display:none}.sidebar-spacer{height:20px}.kpi{padding:10px}.kpi strong{font-size:17px}.transaction-head,.transaction-row{grid-template-columns:35px 2fr 1fr 1fr}.transaction-head span:nth-child(5),.transaction-row span:nth-child(5),.transaction-head span:nth-child(4),.transaction-row span:nth-child(4){display:none}}
+
+/* Final approved mobile composition. Desktop rules above are intentionally untouched. */
+.mobile-topbar,.mobile-greeting,.mobile-bottom-nav,.mobile-pending-marker,
+.mobile-confirm-note,.mobile-insight-page { display:none; }
+
+@media (max-width: 768px) {
+  html,body,.stApp,[data-testid="stAppViewContainer"] { width:100%; max-width:100%; overflow-x:hidden; background:#fff; }
+  [data-testid="stSidebar"],[data-testid="collapsedControl"],[data-testid="stHeader"],
+  [data-testid="stToolbar"],button[title="View fullscreen"],a.header-anchor { display:none!important; }
+  .block-container { width:100%; max-width:100%; padding:12px 16px 116px!important; }
+  .dashboard-header { display:none!important; }
+  .mobile-topbar { display:flex; min-height:52px; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .mobile-brand { display:flex; align-items:center; gap:7px; color:var(--ink); text-decoration:none; font-size:20px; }
+  .mobile-brand .brand-spark { color:var(--primary); font-size:24px; }
+  .mobile-brand strong { font-weight:850; letter-spacing:-.035em; }
+  .mobile-brand b { padding:2px 5px; border-radius:5px; color:#fff; background:var(--primary); font-size:10px; }
+  .mobile-bell { position:relative; font-size:24px; color:#25344a; }
+  .mobile-bell i { position:absolute; right:-1px; top:2px; width:7px; height:7px; border-radius:50%; background:var(--negative); }
+  .mobile-greeting { display:block; margin:0 0 20px; }
+  .mobile-greeting h1 { margin:0 0 6px; font-size:20px; line-height:1.25; letter-spacing:-.025em; }
+  .mobile-greeting p { max-width:285px; margin:0; color:var(--muted); font-size:12px; line-height:1.55; }
+  .mobile-bottom-nav { position:fixed; z-index:9999; left:0; right:0; bottom:0; height:78px; display:grid; grid-template-columns:repeat(5,1fr); align-items:center; padding:7px 10px max(7px,env(safe-area-inset-bottom)); border-top:1px solid var(--line); background:rgba(255,255,255,.97); box-shadow:0 -5px 20px rgba(15,27,45,.06); }
+  .mobile-nav-item { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; color:#425067; text-decoration:none; font-size:9px; font-weight:600; }
+  .mobile-nav-item span { font-size:22px; line-height:1; }
+  .mobile-nav-item.active { color:var(--primary); }
+  .mobile-nav-item.mobile-add span { width:49px; height:49px; display:grid; place-items:center; margin-top:-25px; border:5px solid #fff; border-radius:50%; color:#fff; background:var(--primary); box-shadow:0 6px 16px rgba(22,163,74,.28); font-size:30px; font-weight:300; }
+  [data-testid="stHorizontalBlock"] { flex-wrap:nowrap!important; gap:8px!important; }
+  [data-testid="stHorizontalBlock"]:has(.st-key-transaction_input_card),
+  [data-testid="stHorizontalBlock"]:has(.st-key-cashflow_card) { flex-direction:column!important; }
+  [data-testid="column"] { min-width:0!important; width:100%!important; flex:1 1 0!important; }
+  .st-key-transaction_input_card [data-testid="stVerticalBlockBorderWrapper"] { min-height:0; border-radius:15px; }
+  .st-key-transaction_input_card [data-testid="stVerticalBlockBorderWrapper"]>div { padding:15px!important; }
+  .card-eyebrow { font-size:10px; }
+  .card-heading { max-width:240px; margin-top:14px!important; font-size:18px!important; line-height:1.25; }
+  .stTextArea textarea { height:92px!important; min-height:92px!important; }
+  .st-key-transaction_input_card [data-testid="stHorizontalBlock"] { display:flex; flex-direction:column; }
+  .st-key-transaction_input_card [data-testid="column"] { flex:none!important; }
+  .example-chips { flex-wrap:nowrap; gap:4px; overflow:hidden; }
+  .example-chips span { padding:6px 7px; font-size:8px; }
+  .st-key-transaction_input_card .stButton button { min-height:43px; width:100%; }
+  .st-key-transaction_preview_card:not(:has(.mobile-pending-marker)) { display:none; }
+  .st-key-summary_card { margin-top:24px; }
+  .st-key-summary_card:before { content:"Ringkasan Keuangan"; display:block; margin:0 0 9px 2px; color:var(--ink); font-size:15px; font-weight:800; }
+  .st-key-summary_card [data-testid="stVerticalBlockBorderWrapper"] { border:0; box-shadow:none; }
+  .st-key-summary_card [data-testid="stVerticalBlockBorderWrapper"]>div { padding:0!important; }
+  .kpi { min-height:126px; flex-direction:column; align-items:flex-start; gap:7px; padding:10px 8px; border:1px solid #dcefe2; border-radius:12px; background:#f8fdf9; }
+  .kpi-expense { border-color:#f4d7da; background:#fff9f9; }
+  .kpi-icon { width:32px; height:32px; border-radius:9px; font-size:18px; }
+  .kpi span { font-size:8px; }
+  .kpi strong { margin:4px 0; font-size:clamp(12px,3.5vw,16px); white-space:nowrap; }
+  .kpi small { font-size:8px; }
+  .st-key-cashflow_card,.st-key-insight_card { margin-top:20px; }
+  .st-key-cashflow_card [data-testid="stVerticalBlockBorderWrapper"],.st-key-insight_card [data-testid="stVerticalBlockBorderWrapper"] { min-height:0; }
+  .st-key-cashflow_card [data-testid="stVerticalBlockBorderWrapper"]>div,.st-key-insight_card [data-testid="stVerticalBlockBorderWrapper"]>div { padding:14px!important; }
+  .section-heading { font-size:11px; }
+  .st-key-chat_card,.st-key-export_card { display:none; }
+  .transaction-head { display:none; }
+  .transaction-row { grid-template-columns:38px minmax(0,1fr) auto; grid-template-rows:auto auto; min-height:62px; padding:8px 3px; }
+  .transaction-row .row-icon { grid-row:1/3; }
+  .transaction-row>strong:nth-child(2) { grid-column:2; align-self:end; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .transaction-row>span:nth-child(3) { grid-column:2; align-self:start; }
+  .transaction-row>span:nth-child(4) { display:none; }
+  .transaction-row>span:nth-child(5) { display:block; grid-column:2; color:var(--muted); font-size:8px; padding-left:70px; margin-top:-17px; }
+  .transaction-row .amount { grid-column:3; grid-row:1/3; font-size:11px; white-space:nowrap; }
+  .st-key-history_card { margin-top:20px; }
+  .st-key-history_card .section-heading:after { content:"Lihat semua →"; color:var(--primary); font-size:10px; font-weight:650; }
+  .footer-copy { display:none; }
+
+  /* Parsed transactions become a focused confirmation screen on mobile. */
+  .mobile-pending-marker { display:grid; grid-template-columns:32px 1fr 32px; align-items:center; margin:-4px 0 10px; color:var(--primary); }
+  .mobile-pending-marker a { color:var(--primary); text-decoration:none; font-size:23px; }
+  .mobile-pending-marker strong { text-align:center; font-size:16px; }
+  .mobile-pending-marker span { text-align:right; }
+  .st-key-transaction_preview_card:has(.mobile-pending-marker) [data-testid="stVerticalBlockBorderWrapper"] { min-height:0; border:0; box-shadow:none; background:transparent; }
+  .st-key-transaction_preview_card:has(.mobile-pending-marker) [data-testid="stVerticalBlockBorderWrapper"]>div { padding:6px 0!important; }
+  .st-key-transaction_preview_card:has(.mobile-pending-marker) .card-eyebrow { display:none; }
+  .preview-list { margin-top:14px; border:0; border-radius:14px; box-shadow:0 5px 22px rgba(15,27,45,.09); }
+  .preview-list>div { min-height:72px; align-items:center; padding:14px 18px; font-size:12px; }
+  .preview-list strong { text-align:right; font-size:13px; }
+  .mobile-confirm-note { display:flex; gap:13px; align-items:center; margin:18px 0 10px; padding:13px 16px; border:1px solid #bfe8cc; border-radius:12px; color:var(--primary); font-size:18px; }
+  .mobile-confirm-note span { color:#344158; font-size:11px; line-height:1.45; }
+  .stApp:has(.mobile-pending-marker) .mobile-greeting,.stApp:has(.mobile-pending-marker) .mobile-topbar,
+  .stApp:has(.mobile-pending-marker) .st-key-transaction_input_card,.stApp:has(.mobile-pending-marker) .st-key-summary_card,
+  .stApp:has(.mobile-pending-marker) .st-key-cashflow_card,.stApp:has(.mobile-pending-marker) .st-key-insight_card,
+  .stApp:has(.mobile-pending-marker) .st-key-history_card { display:none!important; }
+  .stApp:has(.mobile-pending-marker) .st-key-transaction_preview_card { display:block; }
+
+  /* Dedicated Insight AI route. */
+  .mobile-insight-page { display:block; }
+  .stApp:has(.mobile-insight-page) .mobile-topbar,
+  .stApp:has(.mobile-insight-page) .mobile-greeting { display:none!important; }
+  .mobile-insight-page>header { display:grid; grid-template-columns:35px 1fr 35px; align-items:center; min-height:56px; }
+  .mobile-insight-page>header a { color:var(--ink); text-decoration:none; font-size:24px; }
+  .mobile-insight-page>header strong { text-align:center; font-size:17px; }
+  .mobile-insight-tabs { display:grid; grid-template-columns:repeat(3,1fr); margin:12px 0 16px; border-bottom:1px solid var(--line); text-align:center; color:var(--muted); font-size:11px; }
+  .mobile-insight-tabs>* { padding:10px 2px; }
+  .mobile-insight-tabs b { color:var(--primary); border-bottom:2px solid var(--primary); }
+  .mobile-primary-insight { position:relative; min-height:205px; padding:22px 20px; overflow:hidden; border-radius:14px; color:#fff; background:linear-gradient(135deg,#082d27,#075b31); }
+  .mobile-primary-insight small { color:#42dc74; }
+  .mobile-primary-insight h2 { max-width:280px; margin:12px 0 8px; color:#fff; font-size:21px; line-height:1.25; }
+  .mobile-primary-insight p { max-width:280px; font-size:12px; line-height:1.6; }
+  .mobile-primary-insight i { position:absolute; right:20px; top:25px; width:45px; height:45px; display:grid; place-items:center; border-radius:11px; color:#44e379; background:rgba(38,190,83,.25); font-size:25px; }
+  .mobile-recommendation { display:grid; grid-template-columns:40px 1fr 20px; gap:10px; align-items:center; margin:16px 0; padding:14px; border:1px solid #ccebd6; border-radius:13px; background:#f8fdf9; }
+  .mobile-recommendation>span { width:38px; height:38px; display:grid; place-items:center; border-radius:10px; color:var(--primary); background:var(--positive-soft); }
+  .mobile-recommendation small,.mobile-recommendation strong { display:block; font-size:10px; }
+  .mobile-recommendation strong { margin-top:4px; color:var(--ink); font-size:12px; line-height:1.4; }
+  .mobile-recommendation>b { color:var(--primary); font-size:22px; }
+  .mobile-insight-page h3 { font-size:13px; }
+  .mobile-insight-empty { padding:26px 18px; border:1px solid var(--line); border-radius:12px; color:var(--muted); text-align:center; font-size:11px; }
+}
