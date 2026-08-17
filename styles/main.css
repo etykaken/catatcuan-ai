@@ -44,7 +44,6 @@ body,
     padding-bottom: 3rem;
 }
 
-[data-testid="stSidebar"],
 [data-testid="collapsedControl"],
 [data-testid="stToolbar"] {
     display: none !important;
@@ -52,7 +51,7 @@ body,
 
 #MainMenu,
 footer,
-header {
+[data-testid="stHeader"] {
     visibility: hidden;
 }
 
@@ -731,6 +730,12 @@ body, .stApp, [data-testid="stAppViewContainer"] { background: var(--bg); }
 [data-testid="collapsedControl"], [data-testid="stToolbar"], #MainMenu, footer { display:none !important; }
 [data-testid="stAppViewContainer"] > .main { margin-left:0; }
 .block-container { max-width:none; padding:20px 26px 36px; }
+@media (min-width:901px) {
+  [data-testid="stSidebar"] { position:fixed !important; inset:0 auto 0 0 !important; height:100vh !important; margin-left:0 !important; transform:translateX(0) !important; visibility:visible !important; }
+  [data-testid="stAppViewContainer"] > .main { width:calc(100% - 246px) !important; margin-left:246px !important; }
+  .block-container { padding-top:20px !important; }
+  .dashboard-header { visibility:visible !important; }
+}
 .sidebar-brand {font-size:23px;font-weight:850}.sidebar-brand b{font-size:11px;background:var(--primary);color:#fff;padding:3px 5px;border-radius:5px}
 .sidebar-tagline { color:var(--muted); font-size:13px; line-height:1.5; margin:8px 6px 24px; }
 .app-nav { display:grid; gap:5px; }
