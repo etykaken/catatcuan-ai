@@ -7,12 +7,31 @@ def render_transaction_preview(
 ) -> tuple[list[dict], bool, bool]:
 
     if not transactions:
+        with st.container(border=True):
+            st.markdown(
+                """
+                <div class="section-title">
+                    <span class="section-number">2</span>
+                    Preview transaksi
+                </div>
+                <div class="section-helper">
+                    Hasil transaksi yang dipahami CatatCuan akan muncul di sini.
+                </div>
+                <div class="preview-empty">
+                    <div class="preview-empty-icon">✦</div>
+                    <strong>Siap memahami ceritamu</strong>
+                    <span>Tulis transaksi di sebelah kiri, lalu pilih Catat transaksi.</span>
+                </div>
+            """,
+                unsafe_allow_html=True,
+            )
         return [], False, False
 
     with st.container(border=True):
         st.markdown(
             """
             <div class="section-title">
+                <span class="section-number">2</span>
                 CatatCuan memahami ceritamu seperti ini
             </div>
 

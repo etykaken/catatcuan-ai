@@ -1,20 +1,20 @@
 :root {
-    --bg: #f6f5f2;
+    --bg: #f5f7f6;
     --surface: #ffffff;
     --surface-soft: #faf9f7;
-    --ink: #1f2329;
+    --ink: #17201b;
     --ink-soft: #343a40;
     --muted: #73777d;
     --line: #e7e4df;
     --line-strong: #d8d4ce;
-    --primary: #23272f;
-    --primary-hover: #111318;
-    --positive: #2f6b4f;
-    --positive-soft: #eef5f1;
-    --negative: #c65d2e;
-    --negative-soft: #fff2ec;
-    --accent: #e66a2c;
-    --accent-soft: #fff4ed;
+    --primary: #176b48;
+    --primary-hover: #10563a;
+    --positive: #17814f;
+    --positive-soft: #eaf7f0;
+    --negative: #dc574f;
+    --negative-soft: #fff0ef;
+    --accent: #1d8157;
+    --accent-soft: #ecf8f1;
     --radius-sm: 10px;
     --radius-md: 14px;
     --radius-lg: 18px;
@@ -39,9 +39,11 @@ body,
 }
 
 .block-container {
-    max-width: 1180px;
-    padding-top: 1.1rem;
+    max-width: 1440px;
+    padding-top: .85rem;
     padding-bottom: 3rem;
+    padding-left: 262px;
+    padding-right: 30px;
 }
 
 [data-testid="stSidebar"],
@@ -55,6 +57,56 @@ footer,
 header {
     visibility: hidden;
 }
+
+.desktop-sidebar {
+    position: fixed;
+    z-index: 999;
+    inset: 0 auto 0 0;
+    width: 232px;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 18px 18px;
+    border-right: 1px solid #e3e9e5;
+    background: #fff;
+}
+
+.sidebar-brand { display: flex; align-items: center; gap: 11px; padding: 0 7px 25px; }
+.sidebar-logo { width: 37px; height: 37px; display: grid; place-items: center; overflow: hidden; border-radius: 10px; background: var(--positive-soft); color: var(--primary); font-weight: 800; }
+.sidebar-logo img { width: 100%; height: 100%; object-fit: contain; }
+.sidebar-brand strong { display: block; font-size: 16px; letter-spacing: -.025em; }
+.sidebar-brand span { display: block; margin-top: 1px; color: #8a938e; font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.sidebar-nav { display: grid; gap: 5px; }
+.sidebar-nav a { display: flex; align-items: center; gap: 11px; min-height: 43px; padding: 0 12px; border-radius: 10px; color: #717a75 !important; font-size: 12px; font-weight: 650; text-decoration: none !important; }
+.sidebar-nav a span { width: 19px; color: #89928d; font-size: 17px; text-align: center; }
+.sidebar-nav a:hover { background: #f3f7f5; }
+.sidebar-nav a.active { color: var(--primary) !important; background: var(--positive-soft); }
+.sidebar-nav a.active span { color: var(--primary); }
+.sidebar-help { display: grid; gap: 4px; margin-top: auto; padding: 15px; border-radius: 12px; background: #f3f8f5; }
+.sidebar-help-icon { width: 24px; height: 24px; display: grid; place-items: center; margin-bottom: 4px; border-radius: 50%; color: white; background: var(--primary); font-size: 11px; font-weight: 800; }
+.sidebar-help strong { font-size: 11px; }
+.sidebar-help span { color: var(--muted); font-size: 9px; line-height: 1.45; }
+.sidebar-version { padding-top: 13px; color: #a0a8a3; font-size: 9px; text-align: center; }
+
+.dashboard-heading { display: grid; gap: 1px; padding: 4px 0 7px; }
+.dashboard-heading span { color: #8c958f; font-size: 9px; font-weight: 800; letter-spacing: .12em; }
+.dashboard-heading strong { color: var(--ink); font-size: 16px; letter-spacing: -.02em; }
+.account-chip { overflow: hidden; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink-soft); background: #fff; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.account-chip span { margin-right: 7px; color: var(--positive); }
+
+[data-testid="stRadio"] > div { gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: white; }
+[data-testid="stRadio"] label { min-height: 27px; padding: 4px 8px; border-radius: 6px; }
+[data-testid="stRadio"] label:has(input:checked) { color: var(--primary); background: var(--positive-soft); }
+[data-testid="stRadio"] label > div:first-child { display: none; }
+[data-testid="stRadio"] p { font-size: 10px; font-weight: 750; }
+
+.dashboard-hero { min-height: 145px; display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 7px 0 18px; padding: 24px 28px; overflow: hidden; border: 1px solid #dfe9e3; border-radius: 15px; background: linear-gradient(118deg, #fff 50%, #eaf6ef 100%); }
+.dashboard-hero h1 { margin: 0; color: var(--ink); font-size: clamp(25px, 3vw, 36px); line-height: 1.08; letter-spacing: -.045em; }
+.dashboard-hero h1 span { color: var(--primary); }
+.dashboard-hero p { max-width: 690px; margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.hero-badge { min-width: 146px; display: grid; grid-template-columns: 34px 1fr; column-gap: 9px; align-items: center; padding: 13px; border: 1px solid #d5e8dd; border-radius: 12px; background: rgba(255,255,255,.74); }
+.hero-badge > span { grid-row: 1 / 3; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; color: white; background: var(--primary); }
+.hero-badge strong { font-size: 10px; }
+.hero-badge small { color: var(--muted); font-size: 8px; }
 
 .topbar {
     display: flex;
@@ -216,7 +268,7 @@ header {
 }
 
 [data-testid="stVerticalBlockBorderWrapper"] > div {
-    padding: 16px;
+    padding: 15px;
 }
 
 .stTextArea textarea,
@@ -281,8 +333,8 @@ header {
 }
 
 .metric-card {
-    min-height: 128px;
-    padding: 18px 16px;
+    min-height: 105px;
+    padding: 15px;
     border: 1px solid var(--line);
     border-radius: 12px;
     text-align: left;
@@ -299,12 +351,20 @@ header {
 }
 
 .metric-value {
-    margin: 13px 0 10px;
+    margin: 9px 0 7px;
     color: var(--ink);
     font-size: 24px;
     font-weight: 850;
     letter-spacing: -0.035em;
 }
+
+.preview-empty { min-height: 205px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; border: 1px dashed #cfdad4; border-radius: 11px; color: var(--muted); background: #fafcfb; text-align: center; }
+.preview-empty-icon { width: 38px; height: 38px; display: grid; place-items: center; margin-bottom: 10px; border-radius: 11px; color: var(--primary); background: var(--positive-soft); font-size: 17px; }
+.preview-empty strong { color: var(--ink-soft); font-size: 12px; }
+.preview-empty span { max-width: 250px; margin-top: 5px; font-size: 10px; line-height: 1.5; }
+
+[data-testid="stVegaLiteChart"] { border-radius: 10px; }
+[data-testid="stElementContainer"] { scroll-margin-top: 12px; }
 
 .metric-icon {
     width: 28px;
@@ -476,6 +536,8 @@ header {
         padding-left: 12px;
         padding-right: 12px;
     }
+
+    .desktop-sidebar { display: none; }
 
     .profile-pill,
     .hero-emoji {

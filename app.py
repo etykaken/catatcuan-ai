@@ -360,7 +360,7 @@ expense_ratio = (
 
 
 # =========================================================
-# TRANSACTION INPUT + SUMMARY
+# TRANSACTION INPUT + PARSED PREVIEW
 # =========================================================
 
 left_column, right_column = st.columns(
@@ -377,11 +377,12 @@ with left_column:
 
 
 with right_column:
-
-    render_summary(
-        total_income,
-        total_expense,
-        net_result,
+    (
+        edited_transactions,
+        save_button,
+        cancel_button,
+    ) = render_transaction_preview(
+        st.session_state.pending_transactions
     )
 
 
@@ -568,14 +569,6 @@ if analyze_button:
 
 if st.session_state.pending_transactions:
 
-    (
-        edited_transactions,
-        save_button,
-        cancel_button,
-    ) = render_transaction_preview(
-        st.session_state.pending_transactions
-    )
-
     if cancel_button:
 
         st.session_state.pending_transactions = []
@@ -615,6 +608,17 @@ if st.session_state.pending_transactions:
 
 
 # =========================================================
+# FINANCIAL SUMMARY
+# =========================================================
+
+render_summary(
+    total_income,
+    total_expense,
+    net_result,
+)
+
+
+# =========================================================
 # FINANCIAL INSIGHT + CASH FLOW
 # =========================================================
 
@@ -624,6 +628,15 @@ render_insight_and_chart(
     total_expense,
     net_result,
     expense_ratio,
+)
+
+
+# =========================================================
+# HISTORY
+# =========================================================
+
+render_history(
+    dataframe
 )
 
 
@@ -781,15 +794,6 @@ if ask_button:
                                 api_key,
                             )
                         )
-
-
-# =========================================================
-# HISTORY
-# =========================================================
-
-render_history(
-    dataframe
-)
 
 
 # =========================================================

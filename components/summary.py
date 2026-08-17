@@ -33,8 +33,8 @@ def render_summary(
         st.markdown(
             """
             <div class="section-title">
-                <span class="section-number">◉</span>
-                Ringkasan Hari Ini
+                <span class="section-number">3</span>
+                Ringkasan Keuangan
             </div>
             """,
             unsafe_allow_html=True,
