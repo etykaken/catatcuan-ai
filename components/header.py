@@ -1,7 +1,5 @@
 import html
 from datetime import datetime
-from pathlib import Path
-
 import streamlit as st
 
 
@@ -21,13 +19,13 @@ def _user_details() -> tuple[str, str, str]:
 def render_sidebar() -> None:
     language = st.session_state.get("language", "id")
     display_name, subtitle, initials = _user_details()
-    logo_path = Path(__file__).resolve().parents[1] / "assets" / "logo dark.png"
-
     with st.sidebar:
-        if logo_path.exists():
-            st.image(str(logo_path), width=178)
-        else:
-            st.markdown('<div class="sidebar-brand">✦ CatatCuan <b>AI</b></div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="sidebar-brand" aria-label="CatatCuan AI">'
+            '<span class="brand-spark" aria-hidden="true">✦</span>'
+            '<span>CatatCuan</span><b>AI</b></div>',
+            unsafe_allow_html=True,
+        )
         st.markdown(
             '<div class="sidebar-tagline">Catat keuangan<br>semudah bercerita.</div>',
             unsafe_allow_html=True,
@@ -94,8 +92,8 @@ def render_header() -> None:
         f"""
         <header class="dashboard-header">
           <div><h1>{html.escape(greeting)}</h1><p>{html.escape(helper)}</p></div>
-          <div class="header-actions"><div class="period-pill">▣&nbsp; {html.escape(period)}⌄</div>
-          <div class="icon-pill" aria-label="Notifikasi">♧</div><div class="header-avatar">{html.escape(initials)}</div></div>
+          <div class="header-actions"><div class="period-pill"><span aria-hidden="true">▣</span>&nbsp; {html.escape(period)} <span aria-hidden="true">⌄</span></div>
+          <div class="icon-pill" aria-label="Notifikasi"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></div><div class="header-avatar">{html.escape(initials)}</div></div>
         </header>
         """,
         unsafe_allow_html=True,
