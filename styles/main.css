@@ -729,9 +729,12 @@ body, .stApp, [data-testid="stAppViewContainer"] { background: var(--bg); }
 [data-testid="stSidebar"] [data-testid="stImage"] { margin:0 0 8px 6px; }
 [data-testid="collapsedControl"] { display:flex !important; }
 [data-testid="stToolbar"], #MainMenu, footer { display:none !important; }
+[data-testid="stHeader"]:has([data-testid="stExpandSidebarButton"]) { visibility:visible !important; }
+[data-testid="stToolbar"]:has([data-testid="stExpandSidebarButton"]) { display:flex !important; }
 .block-container { max-width:none; padding:20px 26px 36px; }
 @media (min-width:901px) {
   [data-testid="stSidebar"] { height:100vh !important; }
+  [data-testid="stAppViewContainer"]:has([data-testid="stExpandSidebarButton"]) .block-container { padding-left:64px; }
   .block-container { padding-top:20px !important; }
   .dashboard-header { visibility:visible !important; }
 }
