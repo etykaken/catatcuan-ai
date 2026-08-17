@@ -3,6 +3,7 @@ import streamlit as st
 
 
 def render_history(dataframe: pd.DataFrame) -> None:
+    st.markdown('<div id="riwayat"></div>', unsafe_allow_html=True)
     with st.container(border=True):
         header_left, header_right = st.columns([4, 1])
 
@@ -10,8 +11,8 @@ def render_history(dataframe: pd.DataFrame) -> None:
             st.markdown(
                 """
                 <div class="section-title">
-                    <span class="section-number">4</span>
-                    🧾 Riwayat Transaksi
+                    <span class="section-number">5</span>
+                    Transaksi Terbaru
                 </div>
                 """,
                 unsafe_allow_html=True,
