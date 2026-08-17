@@ -360,29 +360,19 @@ expense_ratio = (
 
 
 # =========================================================
-# TRANSACTION INPUT + SUMMARY
+# FINANCIAL OVERVIEW + TRANSACTION INPUT
 # =========================================================
 
-left_column, right_column = st.columns(
-    [1, 1],
-    gap="medium",
+render_summary(
+    total_income,
+    total_expense,
+    net_result,
 )
 
-with left_column:
-
-    (
-        transaction_text,
-        analyze_button,
-    ) = render_transaction_input()
-
-
-with right_column:
-
-    render_summary(
-        total_income,
-        total_expense,
-        net_result,
-    )
+(
+    transaction_text,
+    analyze_button,
+) = render_transaction_input()
 
 
 # =========================================================
@@ -628,6 +618,15 @@ render_insight_and_chart(
 
 
 # =========================================================
+# HISTORY
+# =========================================================
+
+render_history(
+    dataframe
+)
+
+
+# =========================================================
 # CHAT
 # =========================================================
 
@@ -781,15 +780,6 @@ if ask_button:
                                 api_key,
                             )
                         )
-
-
-# =========================================================
-# HISTORY
-# =========================================================
-
-render_history(
-    dataframe
-)
 
 
 # =========================================================

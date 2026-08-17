@@ -10,8 +10,8 @@ def render_history(dataframe: pd.DataFrame) -> None:
             st.markdown(
                 """
                 <div class="section-title">
-                    <span class="section-number">4</span>
-                    🧾 Riwayat Transaksi
+                    <span class="section-icon">↻</span>
+                    Transaksi Terbaru
                 </div>
                 """,
                 unsafe_allow_html=True,

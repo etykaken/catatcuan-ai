@@ -33,8 +33,8 @@ def render_summary(
         st.markdown(
             """
             <div class="section-title">
-                <span class="section-number">◉</span>
-                Ringkasan Hari Ini
+                <span class="section-icon">↗</span>
+                Ringkasan Keuangan
             </div>
             """,
             unsafe_allow_html=True,
@@ -44,7 +44,7 @@ def render_summary(
 
         with columns[0]:
             _metric_card(
-                "Pemasukan",
+                "Total Pemasukan",
                 format_rupiah(total_income),
                 "↑",
                 "green",
@@ -52,7 +52,7 @@ def render_summary(
 
         with columns[1]:
             _metric_card(
-                "Pengeluaran",
+                "Total Pengeluaran",
                 format_rupiah(total_expense),
                 "↓",
                 "orange",
@@ -60,7 +60,7 @@ def render_summary(
 
         with columns[2]:
             _metric_card(
-                "Laba Bersih" if net_result >= 0 else "Kerugian",
+                "Laba / Rugi",
                 format_rupiah(abs(net_result)),
                 "⌁",
                 "green" if net_result >= 0 else "orange",

@@ -18,8 +18,8 @@ def render_insight_and_chart(
             st.markdown(
                 """
                 <div class="section-title">
-                    <span class="section-number">2</span>
-                    🤖 AI Financial Insight
+                    <span class="section-icon">✦</span>
+                    Insight Keuangan
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -49,7 +49,7 @@ def render_insight_and_chart(
     with chart_column:
         with st.container(border=True):
             st.markdown(
-                '<div class="section-title">📊 Grafik Arus Kas</div>',
+                '<div class="section-title"><span class="section-icon">▥</span>Arus Kas</div>',
                 unsafe_allow_html=True,
             )
 
