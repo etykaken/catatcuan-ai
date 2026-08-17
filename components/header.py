@@ -1,165 +1,85 @@
+import base64
+import html
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
 
 
+def _logo_data_uri() -> str:
+    logo_path = Path(__file__).resolve().parents[1] / "assets" / "logo.png"
+    if not logo_path.exists():
+        return ""
+    encoded = base64.b64encode(logo_path.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
 def render_header() -> None:
-    if "language" not in st.session_state:
-        st.session_state.language = "id"
+    """Render the fixed desktop navigation and compact dashboard header."""
+    user = st.session_state.get("user")
+    email = getattr(user, "email", "") if user else ""
+    display_name = email.split("@")[0].replace(".", " ").title() if email else "Budi Santoso"
+    first_name = display_name.split()[0] if display_name else "Budi"
+    initials = "".join(part[0] for part in display_name.split()[:2]).upper() or "BS"
+    logo_uri = _logo_data_uri()
+    month_label = datetime.now().strftime("%B %Y")
+    month_names = {
+        "January": "Januari", "February": "Februari", "March": "Maret",
+        "April": "April", "May": "Mei", "June": "Juni", "July": "Juli",
+        "August": "Agustus", "September": "September", "October": "Oktober",
+        "November": "November", "December": "Desember",
+    }
+    english_month, year = month_label.split()
+    period = f"{month_names[english_month]} {year}"
+    logo = f'<img src="{logo_uri}" alt="CatatCuan AI">' if logo_uri else "✦ CatatCuan AI"
 
-    if "auth_mode" not in st.session_state:
-        st.session_state.auth_mode = False
-
-    if "user" not in st.session_state:
-        st.session_state.user = None
-
-    # =====================================================
-    # TOP HEADER
-    # =====================================================
-
-    brand_col, language_col, account_col = st.columns(
-        [4.5, 1.2, 1.8],
-        gap="small",
-        vertical_alignment="center",
+    st.markdown(
+        f"""
+        <aside class="cc-sidebar">
+            <div class="sidebar-brand">{logo}</div>
+            <p class="sidebar-tagline">Catat keuangan<br>semudah bercerita.</p>
+            <nav class="sidebar-nav" aria-label="Navigasi utama">
+                <div class="nav-item active"><span>⌂</span>Beranda</div>
+                <div class="nav-item"><span>⇄</span>Transaksi</div>
+                <div class="nav-item"><span>✧</span>Insight AI</div>
+                <div class="nav-item"><span>▤</span>Laporan</div>
+                <div class="nav-divider"></div>
+                <div class="nav-item"><span>♙</span>Akun</div>
+                <div class="nav-item"><span>⌁</span>Integrasi</div>
+                <div class="nav-item"><span>⚙</span>Pengaturan</div>
+            </nav>
+            <div class="sidebar-bottom">
+                <div class="promo-card">
+                    <div class="promo-mascot">✦</div>
+                    <strong>CatatCuan AI</strong>
+                    <p>Asisten keuangan pintar yang siap membantumu 24/7.</p>
+                    <span>Pelajari lebih lanjut →</span>
+                </div>
+                <div class="user-card">
+                    <div class="user-avatar">{html.escape(initials)}</div>
+                    <div><strong>{html.escape(display_name)}</strong><small>{html.escape(email or 'Warung Pak Budi')}</small></div>
+                    <span>⌄</span>
+                </div>
+            </div>
+        </aside>
+        <header class="dashboard-header">
+            <div>
+                <h1>Selamat pagi, {html.escape(first_name)}! 👋</h1>
+                <p>Yuk catat transaksi hari ini, biar keuangan usahamu makin sehat.</p>
+            </div>
+            <div class="header-actions">
+                <div class="period-pill">▣&nbsp;&nbsp; {period}&nbsp;⌄</div>
+                <div class="icon-button" aria-label="Notifikasi">♧</div>
+                <div class="header-avatar">{html.escape(initials)}</div>
+            </div>
+        </header>
+        """,
+        unsafe_allow_html=True,
     )
 
-    # =====================================================
-    # BRAND
-    # =====================================================
-
-    with brand_col:
-        logo_path = (
-            Path(__file__).resolve().parents[1]
-            / "assets"
-            / "logo.png"
-        )
-
-        logo_col, name_col = st.columns(
-            [0.6, 4.4],
-            gap="small",
-            vertical_alignment="center",
-        )
-
-        with logo_col:
-            if logo_path.exists():
-                st.image(
-                    str(logo_path),
-                    width=46,
-                )
-            else:
-                st.markdown("### 🤖")
-
-        with name_col:
-            st.markdown("### CatatCuan AI")
-            st.caption("AI Financial Assistant")
-
-    # =====================================================
-    # LANGUAGE
-    # =====================================================
-
-    with language_col:
-        language_choice = st.radio(
-            "Language",
-            options=["ID", "EN"],
-            index=(
-                0
-                if st.session_state.language == "id"
-                else 1
-            ),
-            horizontal=True,
-            label_visibility="collapsed",
-            key="header_language",
-        )
-
-        new_language = (
-            "id"
-            if language_choice == "ID"
-            else "en"
-        )
-
-        if new_language != st.session_state.language:
-            st.session_state.language = new_language
+    # Keep the existing authentication entry point without turning navigation
+    # into Streamlit radio controls.
+    if user is None:
+        if st.button("Masuk", key="header_auth_button"):
+            st.session_state.auth_mode = True
             st.rerun()
-
-    # =====================================================
-    # ACCOUNT
-    # =====================================================
-
-    with account_col:
-        if st.session_state.user is None:
-            auth_label = (
-                "Masuk / Buat akun"
-                if st.session_state.language == "id"
-                else "Sign in / Create account"
-            )
-
-            if st.button(
-                auth_label,
-                use_container_width=True,
-                key="header_auth_button",
-            ):
-                st.session_state.auth_mode = True
-                st.rerun()
-
-        else:
-            user_email = getattr(
-                st.session_state.user,
-                "email",
-                "",
-            )
-
-            st.caption(
-                user_email
-                if user_email
-                else "Account"
-            )
-
-    st.write("")
-
-    # =====================================================
-    # HERO
-    # =====================================================
-
-    hero_text_col, hero_icon_col = st.columns(
-        [5, 1],
-        gap="large",
-        vertical_alignment="center",
-    )
-
-    with hero_text_col:
-        if st.session_state.language == "id":
-            st.title(
-                "Catat pemasukan & pengeluaran "
-                "semudah bercerita."
-            )
-
-            st.write(
-                "Ceritakan transaksi usahamu dengan bahasa "
-                "sehari-hari. CatatCuan membantu merapikan "
-                "pencatatan dan memberikan insight keuangan "
-                "yang lebih mudah dipahami."
-            )
-
-        else:
-            st.title(
-                "Track income & expenses "
-                "as naturally as telling a story."
-            )
-
-            st.write(
-                "Describe your daily business transactions "
-                "naturally. CatatCuan helps organize your "
-                "records and turn them into clearer "
-                "financial insights."
-            )
-
-    with hero_icon_col:
-        if logo_path.exists():
-            st.image(
-                str(logo_path),
-                width=100,
-            )
-        else:
-            st.markdown("# 🤖")
-
-    st.write("")
