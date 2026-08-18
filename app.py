@@ -9,6 +9,7 @@ from components.chat import render_chat
 from components.export import render_export
 from components.header import render_header, render_sidebar
 from components.history import render_history
+from components.reports import render_reports
 from components.insight_chart import render_insight_and_chart
 from components.summary import render_summary
 from components.transaction_input import render_transaction_input
@@ -290,8 +291,9 @@ if st.session_state.auth_mode:
 # APPLICATION SHELL + HEADER
 # =========================================================
 
-render_sidebar()
-render_header()
+page = st.query_params.get("page", "beranda")
+page = page if page in {"beranda", "laporan"} else "beranda"
+render_sidebar(page)
 
 
 # =========================================================
@@ -358,6 +360,12 @@ expense_ratio = (
     if total_income > 0
     else 0.0
 )
+
+if page == "laporan":
+    render_reports(dataframe, total_income, total_expense, net_result, expense_ratio)
+    st.stop()
+
+render_header()
 
 
 # =========================================================

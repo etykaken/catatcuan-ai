@@ -18,7 +18,7 @@ def _user_details() -> tuple[str, str, str]:
     return display_name, subtitle, initials
 
 
-def render_sidebar() -> None:
+def render_sidebar(active_page: str = "beranda") -> None:
     language = st.session_state.get("language", "id")
     display_name, subtitle, initials = _user_details()
     logo_path = Path(__file__).resolve().parents[1] / "assets" / "logo dark.png"
@@ -32,13 +32,14 @@ def render_sidebar() -> None:
             '<div class="sidebar-tagline">Catat keuangan<br>semudah bercerita.</div>',
             unsafe_allow_html=True,
         )
+        active_page = active_page if active_page in {"beranda", "laporan"} else "beranda"
         st.markdown(
-            """
+            f"""
             <nav class="app-nav" aria-label="Navigasi utama">
-              <div class="nav-item active"><span>⌂</span> Beranda</div>
+              <a class="nav-item {'active' if active_page == 'beranda' else ''}" href="?page=beranda" target="_self"><span>⌂</span> Beranda</a>
               <div class="nav-item"><span>☷</span> Transaksi</div>
               <div class="nav-item"><span>✧</span> Insight AI</div>
-              <div class="nav-item"><span>▤</span> Laporan</div>
+              <a class="nav-item {'active' if active_page == 'laporan' else ''}" href="?page=laporan" target="_self"><span>▤</span> Laporan</a>
               <div class="nav-divider"></div>
               <div class="nav-item"><span>♙</span> Akun</div>
               <div class="nav-item"><span>⌁</span> Integrasi</div>
